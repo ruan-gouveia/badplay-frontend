@@ -36,7 +36,7 @@ export default function LoginPage() {
   };
 
   return (
-    <PageWrapper>
+    <PageWrapper className="items-center justify-center p-6">
       <div className="w-full max-w-md bg-black/80 p-10 rounded-xl shadow-2xl border border-gray-800 backdrop-blur-sm">
         <h1 className="text-3xl font-bold text-white mb-8">Entrar</h1>
 

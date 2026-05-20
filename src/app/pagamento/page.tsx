@@ -93,7 +93,7 @@ function PagamentoForm() {
 
 export default function PagamentoPage() {
   return (
-    <PageWrapper>
+    <PageWrapper className="items-center justify-center p-6">
       <Suspense fallback={<div className="text-white">Carregando formulário...</div>}>
         <PagamentoForm />
       </Suspense>

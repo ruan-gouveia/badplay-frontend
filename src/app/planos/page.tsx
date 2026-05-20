@@ -21,7 +21,7 @@ export default function PlanosPage() {
   };
 
   return (
-    <PageWrapper>
+    <PageWrapper className="items-center justify-center p-6">
       <div className="w-full max-w-5xl flex flex-col items-center">
         <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 text-center">
           Escolha o plano ideal para você

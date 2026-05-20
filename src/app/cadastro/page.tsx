@@ -65,7 +65,7 @@ function CadastroForm() {
 
 export default function CadastroPage() {
   return (
-    <PageWrapper>
+    <PageWrapper className="items-center justify-center p-6">
       <Suspense fallback={<div className="text-white">Carregando...</div>}>
         <CadastroForm />
       </Suspense>
