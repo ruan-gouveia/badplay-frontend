@@ -11,6 +11,7 @@ export interface Filme {
   capaUrlMinio: string;
   duracaoMinutos: number;
   planoMinimo: string;
+  trailerUrlYoutube: string;
   generos: Genero[];
 }
 
@@ -21,5 +22,13 @@ export interface Serie {
   anoLancamento: number;
   capaUrlMinio: string;
   planoMinimo: string;
+  trailerUrlYoutube: string;
   generos: Genero[];
+}
+
+export interface Avaliacao {
+  id: number;
+  nota: number;
+  comentarioSocial: string;
+  nomeUsuario: string;
 }
