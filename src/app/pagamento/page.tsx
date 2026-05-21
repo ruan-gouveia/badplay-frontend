@@ -4,6 +4,7 @@ import { useState, Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/services/api";
 import PageWrapper from "@/components/PageWrapper";
+import FloatingInput from "@/components/shared/FloatingInput";
 
 function PagamentoForm() {
   const router = useRouter();
@@ -77,9 +78,9 @@ function PagamentoForm() {
 
       <form onSubmit={handlePagamento} className="flex flex-col gap-4">
         {erro && <div className="bg-red-500/20 border border-red-500 text-red-500 text-sm p-3 rounded">{erro}</div>}
-        <input type="text" placeholder="Nome no Cartão" required value={nomeTitular} onChange={(e) => setNomeTitular(e.target.value)} className="w-full bg-[#333333] text-white p-4 rounded focus:outline-none focus:ring-2 focus:ring-red-600" />
-        <input type="text" placeholder="Número do Cartão (16 dígitos)" required maxLength={16} minLength={16} value={numeroCartao} onChange={(e) => setNumeroCartao(e.target.value.replace(/\D/g, ''))} className="w-full bg-[#333333] text-white p-4 rounded focus:outline-none focus:ring-2 focus:ring-red-600" />
-        <input type="text" placeholder="CVV (3 dígitos)" required maxLength={3} minLength={3} value={cvv} onChange={(e) => setCvv(e.target.value.replace(/\D/g, ''))} className="w-full bg-[#333333] text-white p-4 rounded focus:outline-none focus:ring-2 focus:ring-red-600" />
+        <FloatingInput id="nomeTitular" type="text" label="Nome impresso no Cartão" required value={nomeTitular} onChange={(e) => setNomeTitular(e.target.value)} />
+        <FloatingInput id="numeroCartao" type="text" label="Número do Cartão (16 dígitos)" required maxLength={16} minLength={16} value={numeroCartao} onChange={(e) => setNumeroCartao(e.target.value.replace(/\D/g, ''))} />
+        <FloatingInput id="cvv" type="text" label="CVV (3 dígitos)" required maxLength={3} minLength={3} value={cvv} onChange={(e) => setCvv(e.target.value.replace(/\D/g, ''))} />
         <button type="submit" disabled={carregando} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded transition-colors mt-4 disabled:opacity-50">
           {carregando ? "Processando..." : "Assinar / Fazer Upgrade"}
         </button>

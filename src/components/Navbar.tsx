@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // Usando Shadcn!
 
 const navOrder = ["/catalogo", "/filmes", "/series", "/generos", "/listas"];
 
@@ -33,7 +35,6 @@ export default function Navbar() {
     router.push("/");
   };
 
-  // Calcula a direção e salva antes de trocar de página
   const handleNavigation = (e: React.MouseEvent<HTMLAnchorElement>, targetPath: string) => {
     e.preventDefault();
     const currentIndex = navOrder.indexOf(pathname);
@@ -59,43 +60,67 @@ export default function Navbar() {
   };
 
   return (
-    <nav className={`fixed top-0 left-0 w-full z-50 transition-colors duration-500 ${isScrolled ? "bg-[#141414]" : "bg-gradient-to-b from-black/90 to-transparent"}`}>
+    <nav className={`fixed top-0 left-0 w-full z-50 transition-colors duration-500 ${isScrolled ? "bg-[#141414] shadow-md shadow-black/50" : "bg-gradient-to-b from-black/90 to-transparent"}`}>
       <div className="flex items-center justify-between px-6 py-4 md:px-12">
+        
+        {/* ESQUERDA: Logo e Links */}
         <div className="flex items-center gap-8">
           <Link href="/catalogo">
-            <h1 className="text-2xl md:text-3xl font-bold text-red-600 tracking-wider cursor-pointer">BADPLAY</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-red-600 tracking-wider cursor-pointer drop-shadow-md">BADPLAY</h1>
           </Link>
-          <ul className="hidden md:flex gap-6 text-sm font-medium">
-            {navLinks.map((link) => (
-              <li key={link.name}>
-                <a 
-                  href={link.path}
-                  onClick={(e) => handleNavigation(e, link.path)}
-                  className={`transition-colors cursor-pointer hover:text-gray-300 ${pathname === link.path ? "text-white font-bold" : "text-gray-400"}`}
-                >
-                  {link.name}
-                </a>
-              </li>
-            ))}
+          
+          <ul className="hidden md:flex gap-6 text-sm font-medium relative h-full items-center">
+            {navLinks.map((link) => {
+              const isActive = pathname === link.path;
+              
+              return (
+                <li key={link.name} className="relative py-2">
+                  <a 
+                    href={link.path}
+                    onClick={(e) => handleNavigation(e, link.path)}
+                    className={`transition-colors cursor-pointer relative z-10 ${isActive ? "text-white font-bold" : "text-gray-400 hover:text-gray-200"}`}
+                  >
+                    {link.name}
+                  </a>
+                  
+                  {/* MÁGICA: O Indicador Deslizante Vermelho */}
+                  {isActive && (
+                    <motion.div
+                      layoutId="navbar-indicator"
+                      className="absolute -bottom-1 left-0 right-0 h-[2px] bg-red-600 rounded-full"
+                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    />
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
+
+        {/* DIREITA: Busca e Perfil */}
         <div className="flex items-center gap-6">
-          <div className="hidden md:flex items-center bg-black/50 border border-gray-600 rounded px-3 py-1 focus-within:border-white transition-colors">
-            <span className="text-gray-400 mr-2">⌕</span>
+          <div className="hidden md:flex items-center bg-black/60 border border-gray-700 rounded-full px-3 py-1.5 focus-within:border-gray-400 transition-colors">
+            <span className="text-gray-400 mr-2 font-bold">⌕</span>
             <input 
               type="text" 
               placeholder="Buscar..." 
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               onKeyDown={handleBusca}
-              className="bg-transparent text-white text-sm focus:outline-none w-32 focus:w-48 transition-all duration-300 placeholder-gray-400"
+              className="bg-transparent text-white text-sm focus:outline-none w-32 focus:w-48 transition-all duration-300 placeholder-gray-500"
             />
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded bg-red-600 text-white flex items-center justify-center font-bold">
-              {nomeUsuario.charAt(0).toUpperCase()}
-            </div>
-            <button onClick={handleSair} className="text-sm text-gray-400 hover:text-white transition">Sair</button>
+          
+          <div className="flex items-center gap-4">
+            {/* Componente Avatar do Shadcn */}
+            <Avatar className="w-9 h-9 border border-gray-700 cursor-pointer hover:border-red-600 transition-colors">
+              <AvatarFallback className="bg-red-600 text-white font-bold">
+                {nomeUsuario.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <button onClick={handleSair} className="text-sm font-semibold text-gray-400 hover:text-white transition">
+              Sair
+            </button>
           </div>
         </div>
       </div>

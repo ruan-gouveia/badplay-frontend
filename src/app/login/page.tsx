@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api } from "@/services/api";
 import { TokenResponse } from "@/types/auth";
 import PageWrapper from "@/components/PageWrapper";
+import FloatingInput from "@/components/shared/FloatingInput";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -47,22 +48,23 @@ export default function LoginPage() {
             </div>
           )}
 
-          <input
+          
+          <FloatingInput
+            id="email"
             type="email"
-            placeholder="Email"
+            label="Email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-[#333333] text-white p-4 rounded focus:outline-none focus:ring-2 focus:ring-red-600 placeholder-gray-400"
           />
 
-          <input
+          <FloatingInput
+            id="senha"
             type="password"
-            placeholder="Senha"
+            label="Senha"
             required
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
-            className="w-full bg-[#333333] text-white p-4 rounded focus:outline-none focus:ring-2 focus:ring-red-600 placeholder-gray-400"
           />
 
           <button
