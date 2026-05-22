@@ -32,3 +32,17 @@ export interface Avaliacao {
   comentarioSocial: string;
   nomeUsuario: string;
 }
+
+export interface ConteudoLista {
+  id: number;
+  titulo: string;
+  capaUrlMinio: string;
+  planoMinimo: string;
+}
+
+export interface ListaDesejo {
+  id: number;
+  nome: string;
+  dataCriacao: string;
+  conteudos: ConteudoLista[];
+}

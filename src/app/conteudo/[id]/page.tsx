@@ -6,8 +6,10 @@ import { api } from "@/services/api";
 import { Filme, Serie, Avaliacao } from "@/types/conteudo";
 import Navbar from "@/components/Navbar";
 import PageWrapper from "@/components/PageWrapper";
-import { Star, Lock } from "lucide-react"; // Importamos o Lock (Cadeado)
-import { motion, AnimatePresence } from "framer-motion"; // Importamos para a animação do Modal
+import { Star, Lock } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion"; 
+import { toast } from "sonner";
+import { ListaDesejo } from "@/types/conteudo";
 
 export default function ConteudoDetalhesPage() {
   const params = useParams();
@@ -27,6 +29,11 @@ export default function ConteudoDetalhesPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editNota, setEditNota] = useState(0);
   const [editComentario, setEditComentario] = useState("");
+
+  const [showListaModal, setShowListaModal] = useState(false);
+  const [minhasListas, setMinhasListas] = useState<ListaDesejo[]>([]);
+  const [novaListaNome, setNovaListaNome] = useState("");
+  const [salvandoLista, setSalvandoLista] = useState(false);
 
   useEffect(() => {
     setNomeUsuarioLogado(localStorage.getItem("@BadPlay:nome") || "");
@@ -108,6 +115,39 @@ export default function ConteudoDetalhesPage() {
     setEditNota(av.nota);
     setEditComentario(av.comentarioSocial);
     setShowEditModal(true);
+  };
+
+  // Abre o modal e busca as listas que o usuário já tem
+  const abrirModalLista = async () => {
+    setShowListaModal(true);
+    try {
+      const resp = await api.get<ListaDesejo[]>("/listas/minhas");
+      setMinhasListas(resp.data);
+    } catch (error) { console.error(error); }
+  };
+
+  // Adiciona o filme numa lista existente
+  const handleAdicionarNaLista = async (listaId: number) => {
+    try {
+      await api.put(`/listas/${listaId}/adicionar/${id}`);
+      toast.success("Conteúdo adicionado à lista com sucesso!");
+      setShowListaModal(false);
+    } catch (error) { toast.error("Erro ao adicionar na lista."); }
+  };
+
+  // Cria uma lista nova e já adiciona o filme dentro dela
+  const handleCriarNovaLista = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!novaListaNome.trim()) return;
+    setSalvandoLista(true);
+    try {
+      const resp = await api.post("/listas", { nome: novaListaNome });
+      await api.put(`/listas/${resp.data.id}/adicionar/${id}`);
+      toast.success("Lista criada e conteúdo adicionado!");
+      setShowListaModal(false);
+      setNovaListaNome("");
+    } catch (error) { toast.error("Erro ao criar lista."); }
+    finally { setSalvandoLista(false); }
   };
 
   const getYouTubeId = (url: string) => {
@@ -192,6 +232,48 @@ export default function ConteudoDetalhesPage() {
             </motion.div>
           </div>
         )}
+
+        {/* MODAL DE LISTA DE DESEJOS */}
+        {showListaModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md px-4">
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-[#111111] border border-gray-800 p-8 rounded-2xl max-w-md w-full shadow-2xl"
+            >
+              <h2 className="text-2xl font-bold text-white mb-6">Salvar em...</h2>
+              
+              <div className="flex flex-col gap-3 mb-6 max-h-[200px] overflow-y-auto pr-2 scrollbar-hide">
+                {minhasListas.length === 0 ? (
+                  <p className="text-gray-500 text-sm">Você ainda não tem listas criadas.</p>
+                ) : (
+                  minhasListas.map(lista => (
+                    <button key={lista.id} onClick={() => handleAdicionarNaLista(lista.id)}
+                      className="w-full text-left p-4 rounded bg-[#222] hover:bg-red-600/20 border border-gray-700 hover:border-red-500 transition"
+                    >
+                      <p className="text-white font-semibold">{lista.nome}</p>
+                      <p className="text-xs text-gray-500">{lista.conteudos.length} itens</p>
+                    </button>
+                  ))
+                )}
+              </div>
+
+              <div className="border-t border-gray-800 pt-6">
+                <form onSubmit={handleCriarNovaLista} className="flex gap-2">
+                  <input type="text" placeholder="Nome da nova lista" value={novaListaNome} onChange={(e) => setNovaListaNome(e.target.value)} required
+                    className="flex-grow bg-[#141414] text-white p-3 rounded-md border border-gray-700 focus:border-red-600 focus:outline-none text-sm"
+                  />
+                  <button type="submit" disabled={salvandoLista} className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 rounded-md transition disabled:opacity-50 text-sm">
+                    {salvandoLista ? "..." : "Criar"}
+                  </button>
+                </form>
+              </div>
+
+              <button onClick={() => setShowListaModal(false)} className="w-full mt-4 py-3 rounded-md font-semibold text-gray-400 hover:text-white transition">
+                Fechar
+              </button>
+            </motion.div>
+          </div>
+        )}
+
       </AnimatePresence>
 
       <PageWrapper className="p-0">
@@ -223,7 +305,7 @@ export default function ConteudoDetalhesPage() {
 
           {/* BOTOES ADICIONAIS */}
           <div className="flex items-center gap-6 border-b border-gray-800 pb-10">
-            <button className="flex flex-col items-center gap-2 text-gray-400 hover:text-white transition">
+            <button onClick={abrirModalLista} className="flex flex-col items-center gap-2 text-gray-400 hover:text-white transition">
               <div className="w-10 h-10 rounded-full border-2 border-current flex items-center justify-center text-2xl pb-1">+</div>
               <span className="text-sm font-semibold">Minha Lista</span>
             </button>
