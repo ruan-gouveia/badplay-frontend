@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/services/api";
 import PageWrapper from "@/components/PageWrapper";
 import FloatingInput from "@/components/shared/FloatingInput";
-    
+import LoadingButton from "@/components/shared/LoadingButton";
+
 function CadastroForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -25,14 +26,9 @@ function CadastroForm() {
 
     try {
       await api.post("/usuarios", { nome, email, senha, dataNascimento });
-
-      // SEGURANÇA: Salva temporariamente apenas na aba do navegador!
       sessionStorage.setItem("@BadPlay:tempEmail", email);
       sessionStorage.setItem("@BadPlay:tempSenha", senha);
-
-      // Redireciona sem expor a senha na URL
       router.push(`/planos`);
-      
     } catch (err: any) {
       if (err.response?.data) {
         setErro(Object.values(err.response.data).join(" | "));
@@ -49,13 +45,15 @@ function CadastroForm() {
       <h1 className="text-3xl font-bold text-white mb-6">Crie sua conta</h1>
       <form onSubmit={handleCadastro} className="flex flex-col gap-4">
         {erro && <div className="bg-red-500/20 border border-red-500 text-red-500 text-sm p-3 rounded">{erro}</div>}
+        
         <FloatingInput id="nome" type="text" label="Nome completo" required value={nome} onChange={(e) => setNome(e.target.value)} />
         <FloatingInput id="email" type="email" label="Email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         <FloatingInput id="senha" type="password" label="Senha" required value={senha} onChange={(e) => setSenha(e.target.value)} />
         <FloatingInput id="dataNascimento" type="date" label="Data de Nascimento" required value={dataNascimento} onChange={(e) => setDataNascimento(e.target.value)} />
-        <button type="submit" disabled={carregando} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded transition-colors mt-2 disabled:opacity-50">
-          {carregando ? "Criando conta..." : "Próximo"}
-        </button>
+
+        <LoadingButton type="submit" isLoading={carregando} textLoading="Criando conta..." className="mt-2">
+          Próximo
+        </LoadingButton>
       </form>
     </div>
   );

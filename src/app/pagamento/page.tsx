@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, Suspense, useEffect } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/services/api";
 import PageWrapper from "@/components/PageWrapper";
 import FloatingInput from "@/components/shared/FloatingInput";
+import LoadingButton from "@/components/shared/LoadingButton";
 
 function PagamentoForm() {
   const router = useRouter();
@@ -26,15 +27,9 @@ function PagamentoForm() {
       const tokenLocal = localStorage.getItem("@BadPlay:token");
 
       if (tokenLocal) {
-        // FLUXO DE UPGRADE: Usuário já está logado! Só assinar.
-        await api.post("/assinaturas", {
-          planoId: Number(planoId),
-          numeroCartao, nomeTitular, cvv,
-        });
+        await api.post("/assinaturas", { planoId: Number(planoId), numeroCartao, nomeTitular, cvv });
         router.push("/catalogo");
-
       } else {
-        // FLUXO NOVO: Acabou de criar a conta, vamos fazer login primeiro.
         const email = sessionStorage.getItem("@BadPlay:tempEmail");
         const senha = sessionStorage.getItem("@BadPlay:tempSenha");
 
@@ -51,10 +46,7 @@ function PagamentoForm() {
         localStorage.setItem("@BadPlay:nome", dadosLogin.nome);
         localStorage.setItem("@BadPlay:perfil", dadosLogin.perfil);
 
-        await api.post("/assinaturas", {
-          planoId: Number(planoId),
-          numeroCartao, nomeTitular, cvv,
-        });
+        await api.post("/assinaturas", { planoId: Number(planoId), numeroCartao, nomeTitular, cvv });
 
         sessionStorage.removeItem("@BadPlay:tempEmail");
         sessionStorage.removeItem("@BadPlay:tempSenha");
@@ -64,7 +56,7 @@ function PagamentoForm() {
       if (err.response?.data?.erro) {
         setErro(err.response.data.erro);
       } else {
-        setErro("Erro ao processar pagamento. Verifique os dados.");
+        setErro("Erro ao processar pagamento.");
       }
     } finally {
       setCarregando(false);
@@ -78,12 +70,14 @@ function PagamentoForm() {
 
       <form onSubmit={handlePagamento} className="flex flex-col gap-4">
         {erro && <div className="bg-red-500/20 border border-red-500 text-red-500 text-sm p-3 rounded">{erro}</div>}
+
         <FloatingInput id="nomeTitular" type="text" label="Nome impresso no Cartão" required value={nomeTitular} onChange={(e) => setNomeTitular(e.target.value)} />
         <FloatingInput id="numeroCartao" type="text" label="Número do Cartão (16 dígitos)" required maxLength={16} minLength={16} value={numeroCartao} onChange={(e) => setNumeroCartao(e.target.value.replace(/\D/g, ''))} />
         <FloatingInput id="cvv" type="text" label="CVV (3 dígitos)" required maxLength={3} minLength={3} value={cvv} onChange={(e) => setCvv(e.target.value.replace(/\D/g, ''))} />
-        <button type="submit" disabled={carregando} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded transition-colors mt-4 disabled:opacity-50">
-          {carregando ? "Processando..." : "Assinar / Fazer Upgrade"}
-        </button>
+
+        <LoadingButton type="submit" isLoading={carregando} textLoading="Processando..." className="mt-4">
+          Assinar / Fazer Upgrade
+        </LoadingButton>
       </form>
     </div>
   );

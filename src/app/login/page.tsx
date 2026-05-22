@@ -7,6 +7,7 @@ import { api } from "@/services/api";
 import { TokenResponse } from "@/types/auth";
 import PageWrapper from "@/components/PageWrapper";
 import FloatingInput from "@/components/shared/FloatingInput";
+import LoadingButton from "@/components/shared/LoadingButton";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -48,32 +49,12 @@ export default function LoginPage() {
             </div>
           )}
 
-          
-          <FloatingInput
-            id="email"
-            type="email"
-            label="Email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+          <FloatingInput id="email" type="email" label="Email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          <FloatingInput id="senha" type="password" label="Senha" required value={senha} onChange={(e) => setSenha(e.target.value)} />
 
-          <FloatingInput
-            id="senha"
-            type="password"
-            label="Senha"
-            required
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-          />
-
-          <button
-            type="submit"
-            disabled={carregando}
-            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded transition-colors mt-4 disabled:opacity-50"
-          >
-            {carregando ? "Entrando..." : "Entrar"}
-          </button>
+          <LoadingButton type="submit" isLoading={carregando} textLoading="Entrando..." className="mt-4">
+            Entrar
+          </LoadingButton>
         </form>
 
         <p className="text-gray-400 mt-6 text-center">
