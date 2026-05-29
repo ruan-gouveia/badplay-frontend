@@ -5,7 +5,7 @@ import { api } from "@/services/api";
 import { Filme, Serie, Genero } from "@/types/conteudo";
 import PageWrapper from "@/components/PageWrapper";
 import CardConteudo from "@/components/shared/CardConteudo";
-import { Film, Clapperboard, SearchCheck, Popcorn } from "lucide-react"; // Importamos os ícones novos!
+import { Film, Clapperboard, SearchCheck, Popcorn } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export default function GenerosPage() {
@@ -28,6 +28,7 @@ export default function GenerosPage() {
         const generosOrdenados = respGeneros.data.sort((a, b) => a.nome.localeCompare(b.nome));
         setGeneros(generosOrdenados);
         
+        // Filtro contra duplicatas visuais
         setFilmes(respFilmes.data.filter((v, i, a) => a.findIndex(t => t.titulo === v.titulo) === i));
         setSeries(respSeries.data.filter((v, i, a) => a.findIndex(t => t.titulo === v.titulo) === i));
         
@@ -50,7 +51,6 @@ export default function GenerosPage() {
     <PageWrapper hasNavbar={true}>
       <div className="w-full min-h-screen pt-24 px-6 md:px-12 pb-20">
         
-        {/* Título com Ícone */}
         <h2 className="text-3xl md:text-4xl font-bold text-white mb-8 flex items-center gap-3">
           <SearchCheck className="w-8 h-8 text-red-600" />
           Explorar por Gêneros
@@ -64,8 +64,8 @@ export default function GenerosPage() {
           </p>
         ) : (
           <>
+            {/* TRILHO DE BOTÕES DE GÊNERO */}
             <div className="bg-[#111111] border border-gray-800 rounded-xl p-4 md:p-8 mb-12 shadow-lg">
-              {/* Barra de rolagem mais grossa e Badges maiores */}
               <div className="flex gap-4 overflow-x-auto pb-6 pt-2 px-2 scrollbar-hide md:[&::-webkit-scrollbar]:block [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-red-600 [&::-webkit-scrollbar-thumb]:rounded-full transition-colors">
                 {generos.map((genero) => {
                   const isSelected = generoSelecionado === genero.id;
@@ -87,12 +87,14 @@ export default function GenerosPage() {
               </div>
             </div>
 
+            {/* SEÇÃO 1: FILMES */}
             {filmesFiltrados.length > 0 && (
               <div className="mb-12">
                 <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2 border-b border-gray-800 pb-3">
                   <Film className="text-red-600 w-7 h-7" /> Filmes
                 </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 gap-y-8">
+                {/* GRID PEQUENO E ESPREMIDO PARA CABER MUITOS FILMES */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-4 gap-y-8">
                   {filmesFiltrados.map((filme) => (
                     <CardConteudo key={filme.id} id={filme.id} titulo={filme.titulo} capaUrlMinio={filme.capaUrlMinio} planoMinimo={filme.planoMinimo} anoLancamento={filme.anoLancamento} mostrarDetalhes={true} />
                   ))}
@@ -100,12 +102,14 @@ export default function GenerosPage() {
               </div>
             )}
 
+            {/* SEÇÃO 2: SÉRIES */}
             {seriesFiltradas.length > 0 && (
               <div className="mb-12">
                 <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2 border-b border-gray-800 pb-3">
                   <Clapperboard className="text-red-600 w-7 h-7" /> Séries
                 </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 gap-y-8">
+                {/* GRID PEQUENO E ESPREMIDO PARA CABER MUITAS SÉRIES */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-4 gap-y-8">
                   {seriesFiltradas.map((serie) => (
                     <CardConteudo key={serie.id} id={serie.id} titulo={serie.titulo} capaUrlMinio={serie.capaUrlMinio} planoMinimo={serie.planoMinimo} anoLancamento={serie.anoLancamento} mostrarDetalhes={true} />
                   ))}
@@ -113,7 +117,7 @@ export default function GenerosPage() {
               </div>
             )}
 
-            {/* AVISO VAZIO LIMPO E COM PIPOCA */}
+            {/* ESTADO VAZIO (NENHUM FILME OU SÉRIE NO GÊNERO ESCOLHIDO) */}
             {filmesFiltrados.length === 0 && seriesFiltradas.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 mt-8">
                 <div className="w-24 h-24 bg-red-600/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
