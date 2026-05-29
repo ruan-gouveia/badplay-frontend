@@ -29,7 +29,11 @@ export default function LoginPage() {
       localStorage.setItem("@BadPlay:nome", dados.nome);
       localStorage.setItem("@BadPlay:perfil", dados.perfil);
 
-      router.push("/catalogo");
+      if (dados.perfil === "ROLE_ADMIN") {
+        router.push("/admin");
+      } else {
+        router.push("/catalogo");
+      }
     } catch (err: any) {
       setErro("E-mail ou senha incorretos.");
     } finally {
