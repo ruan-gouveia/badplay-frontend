@@ -16,7 +16,7 @@ export default function Sidebar() {
   ];
 
   return (
-    <aside className="w-64 bg-[#111111] border-r border-gray-800 flex-col hidden md:flex min-h-screen sticky top-0">
+    <aside className="w-64 bg-[#111111] border-r border-gray-800 flex flex-col hidden md:flex h-full">
       <div className="p-6 border-b border-gray-800">
         <h1 className="text-2xl font-bold text-red-600 tracking-widest">
           BADPLAY <span className="text-white text-sm font-normal ml-1">ADMIN</span>

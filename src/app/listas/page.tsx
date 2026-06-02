@@ -26,7 +26,11 @@ export default function ListasPage() {
   const buscarListas = async () => {
     try {
       const resp = await api.get<ListaDesejo[]>("/listas/minhas");
-      setListas(resp.data);
+      const listasOrdenadas = resp.data.map(lista => ({
+        ...lista,
+        conteudos: lista.conteudos.sort((a, b) => a.titulo.localeCompare(b.titulo))
+      }));
+      setListas(listasOrdenadas);
     } catch (error) { console.error("Erro", error); }
     finally { setCarregando(false); }
   };
@@ -149,7 +153,7 @@ export default function ListasPage() {
                       <p className="text-gray-500">Esta lista está vazia no momento.</p>
                     </div>
                   ) : (
-                    <div className="flex gap-4 overflow-x-auto pb-6 scrollbar-hide">
+                    <div className="flex gap-4 overflow-x-auto pb-6 custom-scrollbar">
                       {lista.conteudos.map((conteudo) => (
                         <div key={conteudo.id} className="flex flex-col items-end group min-w-[160px] w-[160px] md:min-w-[200px] md:w-[200px]">
                           <CardConteudo id={conteudo.id} titulo={conteudo.titulo} capaUrlMinio={conteudo.capaUrlMinio} planoMinimo={conteudo.planoMinimo} mostrarDetalhes={false} className="w-full mb-2" />

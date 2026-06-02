@@ -16,7 +16,7 @@ export default function FilmesPage() {
       try {
         const resp = await api.get<Filme[]>("/filmes");
         const unicos = resp.data.filter((v, i, a) => a.findIndex(t => t.titulo === v.titulo) === i);
-        setFilmes(unicos);
+        setFilmes(unicos.sort((a, b) => a.titulo.localeCompare(b.titulo)));
       } catch (error) { console.error("Erro ao buscar filmes", error); } 
       finally { setCarregando(false); }
     };

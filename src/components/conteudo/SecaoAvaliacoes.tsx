@@ -123,7 +123,7 @@ export default function SecaoAvaliacoes({ conteudoId }: { conteudoId: string }) 
 
         <div>
           <h3 className="text-2xl font-bold text-white mb-6">O que estão achando</h3>
-          <div className="flex flex-col gap-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
+          <div className="flex flex-col gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
             {avaliacoes.length === 0 ? (
               <p className="text-gray-500 italic bg-[#111111] p-6 rounded-2xl border border-gray-800 text-center py-10">Nenhuma avaliação ainda.</p>
             ) : (

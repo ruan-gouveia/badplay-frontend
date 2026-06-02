@@ -7,14 +7,77 @@
 @theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-
-  
-  
   --color-primary: #dc2626;
   --color-primary-foreground: #ffffff;
 }
 
-body {
-  background-color: #141414;
-  color: #ffffff;
+@layer base {
+  html, body {
+    background-color: #141414;
+    color: #ffffff;
+  }
+
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: #333333;
+    border-radius: 10px;
+    border: 3px solid #141414;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #dc2626;
+  }
+}
+
+@utility custom-scrollbar {
+  &::-webkit-scrollbar {
+    height: 14px !important;
+    width: 14px !important;
+  }
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border-radius: 10px !important;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: #4a4a4a !important;
+    border-radius: 10px !important;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: #dc2626 !important;
+  }
+  &::-webkit-scrollbar-button:single-button {
+    display: block !important;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 10px;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+  &::-webkit-scrollbar-button:single-button:horizontal:decrement {
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23dc2626%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%2215%2018%209%2012%2015%206%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E") !important;
+  }
+  &::-webkit-scrollbar-button:single-button:horizontal:increment {
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23dc2626%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%229%2018%2015%2012%209%206%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E") !important;
+  }
+  &::-webkit-scrollbar-button:single-button:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+  }
+}
+
+@utility scrollbar-hide {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

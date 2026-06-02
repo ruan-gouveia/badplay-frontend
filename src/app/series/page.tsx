@@ -16,7 +16,7 @@ export default function SeriesPage() {
       try {
         const resp = await api.get<Serie[]>("/series");
         const unicas = resp.data.filter((v, i, a) => a.findIndex(t => t.titulo === v.titulo) === i);
-        setSeries(unicas);
+        setSeries(unicas.sort((a, b) => a.titulo.localeCompare(b.titulo)));
       } catch (error) { console.error("Erro ao buscar séries", error); } 
       finally { setCarregando(false); }
     };

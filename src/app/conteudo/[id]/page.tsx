@@ -69,7 +69,7 @@ export default function ConteudoDetalhesPage() {
 
       <div className="relative w-full h-[60vh] md:h-[80vh] bg-black pt-20">
         {ytId && !showUpgradeModal ? (
-          <iframe className="w-full h-full border-none" src={`https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&modestbranding=1`} allowFullScreen></iframe>
+          <iframe className="w-full h-full border-none" src={`https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&modestbranding=1`} title="Trailer" allowFullScreen></iframe>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 bg-gray-900/20"><span className="text-4xl mb-2">🎬</span><p>Trailer bloqueado ou não disponível.</p></div>
         )}

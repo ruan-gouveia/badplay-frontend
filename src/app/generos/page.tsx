@@ -28,9 +28,8 @@ export default function GenerosPage() {
         const generosOrdenados = respGeneros.data.sort((a, b) => a.nome.localeCompare(b.nome));
         setGeneros(generosOrdenados);
         
-        // Filtro contra duplicatas visuais
-        setFilmes(respFilmes.data.filter((v, i, a) => a.findIndex(t => t.titulo === v.titulo) === i));
-        setSeries(respSeries.data.filter((v, i, a) => a.findIndex(t => t.titulo === v.titulo) === i));
+        setFilmes(respFilmes.data.filter((v, i, a) => a.findIndex(t => t.titulo === v.titulo) === i).sort((a, b) => a.titulo.localeCompare(b.titulo)));
+        setSeries(respSeries.data.filter((v, i, a) => a.findIndex(t => t.titulo === v.titulo) === i).sort((a, b) => a.titulo.localeCompare(b.titulo)));
         
         if (generosOrdenados.length > 0) {
           setGeneroSelecionado(generosOrdenados[0].id);
@@ -66,7 +65,7 @@ export default function GenerosPage() {
           <>
             {/* TRILHO DE BOTÕES DE GÊNERO */}
             <div className="bg-[#111111] border border-gray-800 rounded-xl p-4 md:p-8 mb-12 shadow-lg">
-              <div className="flex gap-4 overflow-x-auto pb-6 pt-2 px-2 scrollbar-hide md:[&::-webkit-scrollbar]:block [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-red-600 [&::-webkit-scrollbar-thumb]:rounded-full transition-colors">
+              <div className="flex gap-4 overflow-x-auto pb-6 pt-2 px-2 custom-scrollbar">
                 {generos.map((genero) => {
                   const isSelected = generoSelecionado === genero.id;
                   return (

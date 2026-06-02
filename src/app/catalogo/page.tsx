@@ -24,8 +24,11 @@ export default function CatalogoPage() {
           api.get<Filme[]>("/filmes"), api.get<Serie[]>("/series"), api.get<Historico[]>("/historico/meu-historico")
         ]);
         
-        setFilmes(respFilmes.data.filter((v, i, a) => a.findIndex(t => t.titulo === v.titulo) === i));
-        setSeries(respSeries.data.filter((v, i, a) => a.findIndex(t => t.titulo === v.titulo) === i));
+        const f = respFilmes.data.filter((v, i, a) => a.findIndex(t => t.titulo === v.titulo) === i);
+        const s = respSeries.data.filter((v, i, a) => a.findIndex(t => t.titulo === v.titulo) === i);
+        
+        setFilmes(f.sort((a, b) => a.titulo.localeCompare(b.titulo)));
+        setSeries(s.sort((a, b) => a.titulo.localeCompare(b.titulo)));
         setHistorico(respHistorico.data.filter((v, i, a) => a.findIndex(t => t.conteudoTitulo === v.conteudoTitulo) === i));
       } catch (error) { console.error(error); }
     };
@@ -56,7 +59,7 @@ export default function CatalogoPage() {
             <h3 className="text-2xl font-bold mb-6 text-white flex items-center gap-2">
               <StepForward className="w-7 h-7 text-red-600" /> Continuar Assistindo
             </h3>
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+            <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
               {historico.map((hist) => (
                 <div key={hist.id} onClick={() => router.push(`/conteudo/${hist.conteudoId}`)} className="min-w-[240px] w-[240px] flex-none cursor-pointer group relative transition-transform duration-300 hover:scale-105">
                   <div className="relative h-[140px] rounded-md overflow-hidden border border-gray-800 bg-[#222] shadow-lg">
@@ -89,7 +92,7 @@ export default function CatalogoPage() {
             <h3 className="text-2xl font-bold mb-6 text-white flex items-center gap-2">
               <Film className="w-7 h-7 text-red-600" /> Filmes
             </h3>
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+            <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
               {filmes.map((filme) => (
                 <CardConteudo key={filme.id} id={filme.id} titulo={filme.titulo} capaUrlMinio={filme.capaUrlMinio} planoMinimo={filme.planoMinimo} mostrarDetalhes={false} className="min-w-[200px] w-[200px]" />
               ))}
@@ -103,7 +106,7 @@ export default function CatalogoPage() {
             <h3 className="text-2xl font-bold mb-6 text-white flex items-center gap-2">
               <Clapperboard className="w-7 h-7 text-red-600" /> Séries
             </h3>
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+            <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
               {series.map((serie) => (
                 <CardConteudo key={serie.id} id={serie.id} titulo={serie.titulo} capaUrlMinio={serie.capaUrlMinio} planoMinimo={serie.planoMinimo} mostrarDetalhes={false} className="min-w-[200px] w-[200px]" />
               ))}
