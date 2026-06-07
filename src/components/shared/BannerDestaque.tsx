@@ -19,7 +19,7 @@ export default function BannerDestaque({ destaque }: { destaque: DestaqueProps }
   const router = useRouter();
 
   const getUrlImagem = (nome: string) => 
-    nome ? `http://localhost:8080/api/arquivos/${nome}` : "https://via.placeholder.com/300x450?text=Sem+Capa";
+    nome ? `${process.env.NEXT_PUBLIC_R2_URL}/${nome}` : "https://via.placeholder.com/300x450?text=Sem+Capa";
 
   const planoReal = destaque.planoMinimo || "BASICO";
 

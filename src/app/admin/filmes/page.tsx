@@ -10,7 +10,9 @@ import CustomModal from "@/components/shared/CustomModal";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-interface TMDBResult { id: number; title: string; release_date: string; poster_path: string; overview: string; }
+interface TMDBResult {
+  id: number; title: string; release_date: string; poster_path: string; overview: string;
+}
 
 export default function AdminFilmesPage() {
   const [filmes, setFilmes] = useState<Filme[]>([]);
@@ -154,12 +156,13 @@ export default function AdminFilmesPage() {
 
   return (
     <>
+      {/* MODAL TMDb */}
       <CustomModal isOpen={showTmdbModal} title="Buscar Filme (TMDb)" maxWidth="max-w-4xl">
         <form onSubmit={buscarNoTMDB} className="flex gap-2 mb-6">
           <input type="text" autoFocus placeholder="Digite o nome (Ex: Vingadores, Matrix)..." value={query} onChange={(e) => setQuery(e.target.value)} className="flex-grow bg-[#141414] text-white p-3 rounded-md border border-gray-700 focus:border-red-600 focus:outline-none" />
           <LoadingButton type="submit" isLoading={buscandoTmdb} textLoading="Buscando..." className="!w-auto px-6"><Search className="w-5 h-5 mr-2" /> Buscar</LoadingButton>
         </form>
-        <div className="max-h-[500px] overflow-y-auto pr-2 scrollbar-hide">
+        <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
           {resultadosTmdb.length === 0 && !buscandoTmdb ? (
             <p className="text-gray-500 text-center py-10">Pesquise por um filme para importar.</p>
           ) : (
@@ -187,7 +190,7 @@ export default function AdminFilmesPage() {
         </div>
       </CustomModal>
 
-      {/* NOVO MODAL DE DELETAR */}
+      {/* MODAL DE DELETAR */}
       <CustomModal isOpen={showDeleteModal} title="Excluir Filme" icon={<Trash2 className="w-8 h-8" />} centerTitle>
         <p className="text-gray-400 mb-8 leading-relaxed text-center">
           Tem certeza que deseja deletar este filme do catálogo? Esta ação apagará o histórico e as listas de todos os usuários que o salvaram.
@@ -198,6 +201,7 @@ export default function AdminFilmesPage() {
         </div>
       </CustomModal>
 
+      {/* TELA PRINCIPAL DO ADMIN */}
       <div>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
@@ -240,10 +244,7 @@ export default function AdminFilmesPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      {/* BOTAO ATUALIZADO */}
-                      <button onClick={() => abrirModalDeletar(filme.id)} className="text-gray-500 hover:text-red-500 p-2 transition">
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      <button onClick={() => abrirModalDeletar(filme.id)} className="text-gray-500 hover:text-red-500 p-2 transition"><Trash2 className="w-5 h-5" /></button>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -43,7 +43,7 @@ export default function CatalogoPage() {
     } catch (error) { console.error(error); }
   };
 
-  const getUrlImagem = (nome: string) => nome ? `http://localhost:8080/api/arquivos/${nome}` : "https://via.placeholder.com/300x450?text=Sem+Capa";
+  const getUrlImagem = (nome: string) => nome ? `${process.env.NEXT_PUBLIC_R2_URL}/${nome}` : "https://via.placeholder.com/300x450?text=Sem+Capa";
   const destaque = filmes.length > 0 ? filmes[0] : null;
 
   return (
