@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/services/api";
-import { Serie, Genero } from "@/types/conteudo";
+import { Serie, Genero, Temporada, Episodio } from "@/types/conteudo";
 import axios from "axios";
-import { Search, Plus, Trash2, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Search, Plus, Trash2, Image as ImageIcon, Loader2, ListVideo, ChevronDown, ChevronUp } from "lucide-react";
 import LoadingButton from "@/components/shared/LoadingButton";
 import CustomModal from "@/components/shared/CustomModal";
 import { toast } from "sonner";
@@ -12,21 +12,47 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 interface TMDBTvResult { id: number; name: string; first_air_date: string; poster_path: string; overview: string; }
 
+// Tipos locais para o formulário de episódio (sem id, pois são novos)
+interface EpisodioForm {
+  tempId: number; // id local apenas para controle do React
+  nome: string;
+  numeroEpisodio: number;
+  duracaoMinutos: number;
+  trailerUrlYoutube: string;
+}
+
+interface TemporadaForm {
+  tempId: number;
+  numeroTemporada: number;
+  episodios: EpisodioForm[];
+}
+
+let nextTempId = 1;
+const novoTempId = () => nextTempId++;
+
 export default function AdminSeriesPage() {
   const [series, setSeries] = useState<Serie[]>([]);
   const [generosLocais, setGenerosLocais] = useState<Genero[]>([]);
   const [carregando, setCarregando] = useState(true);
 
+  // Modal TMDB
   const [showTmdbModal, setShowTmdbModal] = useState(false);
   const [query, setQuery] = useState("");
   const [resultadosTmdb, setResultadosTmdb] = useState<TMDBTvResult[]>([]);
   const [buscandoTmdb, setBuscandoTmdb] = useState(false);
   const [importandoId, setImportandoId] = useState<number | null>(null);
 
-  // Estados Modal Exclusão
+  // Modal Exclusão
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [idParaDeletar, setIdParaDeletar] = useState<number | null>(null);
   const [deletando, setDeletando] = useState(false);
+
+  // Modal Temporadas
+  const [showTemporadasModal, setShowTemporadasModal] = useState(false);
+  const [serieEditando, setSerieEditando] = useState<Serie | null>(null);
+  const [temporadasForm, setTemporadasForm] = useState<TemporadaForm[]>([]);
+  const [salvandoTemporadas, setSalvandoTemporadas] = useState(false);
+  const [temporadaAberta, setTemporadaAberta] = useState<number | null>(null);
 
   const buscarSeriesBanco = async () => {
     try {
@@ -47,6 +73,8 @@ export default function AdminSeriesPage() {
     buscarDadosIniciais();
   }, []);
 
+  // ── TMDB ──────────────────────────────────────────────────────────────────
+
   const buscarNoTMDB = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query) return;
@@ -55,7 +83,7 @@ export default function AdminSeriesPage() {
       const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
       const resp = await axios.get(`https://api.themoviedb.org/3/search/tv?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}&language=pt-BR`);
       setResultadosTmdb(resp.data.results);
-    } catch (error) { toast.error("Erro ao comunicar com o TMDb."); } 
+    } catch (error) { toast.error("Erro ao comunicar com o TMDb."); }
     finally { setBuscandoTmdb(false); }
   };
 
@@ -65,22 +93,30 @@ export default function AdminSeriesPage() {
     return new File([buf], filename, { type: mimeType });
   };
 
+  const buscarTrailerEpisodio = async (tmdbSerieId: number, numeroTemporada: number, numeroEpisodio: number, tmdbKey: string): Promise<string> => {
+    try {
+      // Tenta pt-BR primeiro, depois en-US
+      for (const lang of ["pt-BR", "en-US"]) {
+        const res = await axios.get(
+          `https://api.themoviedb.org/3/tv/${tmdbSerieId}/season/${numeroTemporada}/episode/${numeroEpisodio}/videos?api_key=${tmdbKey}&language=${lang}`
+        );
+        const trailer = res.data.results?.find((v: any) => v.site === "YouTube" && v.type === "Trailer");
+        if (trailer) return `https://www.youtube.com/watch?v=${trailer.key}`;
+      }
+    } catch { /* episódio sem trailer, não é erro crítico */ }
+    return "";
+  };
+
   const handleImportarSerie = async (tmdbSerie: TMDBTvResult) => {
     setImportandoId(tmdbSerie.id);
     try {
       const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+
+      // 1. Detalhes gerais da série
       const detalhesRes = await axios.get(`https://api.themoviedb.org/3/tv/${tmdbSerie.id}?api_key=${TMDB_KEY}&language=pt-BR`);
       const detalhes = detalhesRes.data;
 
-      const videosRes = await axios.get(`https://api.themoviedb.org/3/tv/${tmdbSerie.id}/videos?api_key=${TMDB_KEY}&language=pt-BR`);
-      let trailerUrl = "";
-      let trailer = videosRes.data.results.find((v: any) => v.site === "YouTube" && v.type === "Trailer");
-      if (!trailer) {
-        const videosEn = await axios.get(`https://api.themoviedb.org/3/tv/${tmdbSerie.id}/videos?api_key=${TMDB_KEY}&language=en-US`);
-        trailer = videosEn.data.results.find((v: any) => v.site === "YouTube" && v.type === "Trailer");
-      }
-      if (trailer) trailerUrl = `https://www.youtube.com/watch?v=${trailer.key}`;
-
+      // 2. Gêneros
       const generosIds: number[] = [];
       if (detalhes.genres) {
         detalhes.genres.forEach((g: any) => {
@@ -89,37 +125,98 @@ export default function AdminSeriesPage() {
         });
       }
 
+      // 3. Capa
       let imageFile: File | null = null;
       if (tmdbSerie.poster_path) {
-        imageFile = await urlToFile(`https://image.tmdb.org/t/p/w500${tmdbSerie.poster_path}`, `tmdb_tv_${tmdbSerie.id}.jpg`, 'image/jpeg');
+        imageFile = await urlToFile(`https://image.tmdb.org/t/p/w500${tmdbSerie.poster_path}`, `tmdb_tv_${tmdbSerie.id}.jpg`, "image/jpeg");
       }
       if (!imageFile) throw new Error("Série sem capa não pode ser importada.");
+
+      // 4. Temporadas e episódios — ignora temporadas especiais (número 0)
+      const temporadasValidas: any[] = (detalhes.seasons || []).filter((s: any) => s.season_number > 0);
+
+      const temporadas = await Promise.all(
+        temporadasValidas.map(async (season: any) => {
+          // Busca episódios da temporada
+          const seasonRes = await axios.get(
+            `https://api.themoviedb.org/3/tv/${tmdbSerie.id}/season/${season.season_number}?api_key=${TMDB_KEY}&language=pt-BR`
+          );
+          const episodiosTMDB: any[] = seasonRes.data.episodes || [];
+
+          // Busca trailers de cada episódio em paralelo (limitado a 5 por vez para não sobrecarregar)
+          const episodios = [];
+          for (let i = 0; i < episodiosTMDB.length; i += 5) {
+            const lote = episodiosTMDB.slice(i, i + 5);
+            const resultados = await Promise.all(
+              lote.map(async (ep: any) => {
+                const trailerUrl = await buscarTrailerEpisodio(tmdbSerie.id, season.season_number, ep.episode_number, TMDB_KEY!);
+                return {
+                  nome: ep.name || `Episódio ${ep.episode_number}`,
+                  numeroEpisodio: ep.episode_number,
+                  duracaoMinutos: ep.runtime || 0,
+                  trailerUrlYoutube: trailerUrl,
+                };
+              })
+            );
+            episodios.push(...resultados);
+          }
+
+          return {
+            numeroTemporada: season.season_number,
+            episodios,
+          };
+        })
+      );
 
       const dadosSerie = {
         titulo: detalhes.name,
         descricao: detalhes.overview || "Sem descrição.",
         anoLancamento: detalhes.first_air_date ? parseInt(detalhes.first_air_date.substring(0, 4)) : new Date().getFullYear(),
         planoMinimo: "BASICO",
-        trailerUrlYoutube: trailerUrl,
-        generosIds: generosIds,
-        temporadas: [] 
+        generosIds,
+        temporadas,
       };
 
       const formData = new FormData();
       formData.append("dados", new Blob([JSON.stringify(dadosSerie)], { type: "application/json" }));
       formData.append("capa", imageFile);
 
-      const resp = await api.post("/series", formData, { headers: { "Content-Type": "multipart/form-data" }});
+      const resp = await api.post("/series", formData, { headers: { "Content-Type": "multipart/form-data" } });
       setSeries([resp.data, ...series]);
-      toast.success(`${detalhes.name} importada com sucesso!`);
-    } catch (error: any) { toast.error(error.message || "Erro ao importar."); } 
+
+      const totalEps = temporadas.reduce((acc, t) => acc + t.episodios.length, 0);
+      toast.success(`${detalhes.name} importada com ${temporadas.length} temporada(s) e ${totalEps} episódio(s)!`);
+      setShowTmdbModal(false);
+    } catch (error: any) { toast.error(error.message || "Erro ao importar."); }
     finally { setImportandoId(null); }
   };
 
-  const abrirModalDeletar = (id: number) => {
-    setIdParaDeletar(id);
-    setShowDeleteModal(true);
+  // ── PLANO ─────────────────────────────────────────────────────────────────
+
+  const handleChangePlano = async (serie: Serie, novoPlano: string) => {
+    try {
+      const dadosSerie = {
+        titulo: serie.titulo, descricao: serie.descricao, anoLancamento: serie.anoLancamento,
+        planoMinimo: novoPlano, generosIds: serie.generos.map(g => g.id),
+        temporadas: (serie.temporadas || []).map(t => ({
+          numeroTemporada: t.numeroTemporada,
+          episodios: (t.episodios || []).map(e => ({
+            nome: e.nome, numeroEpisodio: e.numeroEpisodio,
+            duracaoMinutos: e.duracaoMinutos, trailerUrlYoutube: e.trailerUrlYoutube,
+          })),
+        })),
+      };
+      const formData = new FormData();
+      formData.append("dados", new Blob([JSON.stringify(dadosSerie)], { type: "application/json" }));
+      const resp = await api.put(`/series/${serie.id}`, formData, { headers: { "Content-Type": "multipart/form-data" } });
+      setSeries(series.map(s => s.id === serie.id ? resp.data : s));
+      toast.success(`Plano atualizado para ${novoPlano}!`);
+    } catch (error) { toast.error("Erro ao alterar o plano."); }
   };
+
+  // ── EXCLUSÃO ──────────────────────────────────────────────────────────────
+
+  const abrirModalDeletar = (id: number) => { setIdParaDeletar(id); setShowDeleteModal(true); };
 
   const confirmarDeletar = async () => {
     if (!idParaDeletar) return;
@@ -131,28 +228,139 @@ export default function AdminSeriesPage() {
       setShowDeleteModal(false);
     } catch (error: any) {
       toast.error(error.response?.data?.erro || "Erro ao deletar série.");
+    } finally { setDeletando(false); }
+  };
+
+  // ── TEMPORADAS MODAL ──────────────────────────────────────────────────────
+
+  const abrirModalTemporadas = (serie: Serie) => {
+    setSerieEditando(serie);
+    // Converte temporadas existentes para o formato do formulário
+    const formsExistentes: TemporadaForm[] = (serie.temporadas || [])
+      .slice()
+      .sort((a, b) => a.numeroTemporada - b.numeroTemporada)
+      .map(t => ({
+        tempId: novoTempId(),
+        numeroTemporada: t.numeroTemporada,
+        episodios: (t.episodios || [])
+          .slice()
+          .sort((a, b) => a.numeroEpisodio - b.numeroEpisodio)
+          .map(e => ({
+            tempId: novoTempId(),
+            nome: e.nome,
+            numeroEpisodio: e.numeroEpisodio,
+            duracaoMinutos: e.duracaoMinutos,
+            trailerUrlYoutube: e.trailerUrlYoutube || "",
+          })),
+      }));
+    setTemporadasForm(formsExistentes);
+    setTemporadaAberta(formsExistentes.length > 0 ? formsExistentes[0].tempId : null);
+    setShowTemporadasModal(true);
+  };
+
+  const adicionarTemporada = () => {
+    const proximoNumero = temporadasForm.length > 0
+      ? Math.max(...temporadasForm.map(t => t.numeroTemporada)) + 1
+      : 1;
+    const nova: TemporadaForm = { tempId: novoTempId(), numeroTemporada: proximoNumero, episodios: [] };
+    setTemporadasForm([...temporadasForm, nova]);
+    setTemporadaAberta(nova.tempId);
+  };
+
+  const removerTemporada = (tempId: number) => {
+    setTemporadasForm(temporadasForm.filter(t => t.tempId !== tempId));
+  };
+
+  const adicionarEpisodio = (tempIdTemporada: number) => {
+    setTemporadasForm(temporadasForm.map(t => {
+      if (t.tempId !== tempIdTemporada) return t;
+      const proximoNum = t.episodios.length > 0
+        ? Math.max(...t.episodios.map(e => e.numeroEpisodio)) + 1
+        : 1;
+      return {
+        ...t,
+        episodios: [...t.episodios, {
+          tempId: novoTempId(),
+          nome: "",
+          numeroEpisodio: proximoNum,
+          duracaoMinutos: 0,
+          trailerUrlYoutube: "",
+        }],
+      };
+    }));
+  };
+
+  const removerEpisodio = (tempIdTemporada: number, tempIdEpisodio: number) => {
+    setTemporadasForm(temporadasForm.map(t => {
+      if (t.tempId !== tempIdTemporada) return t;
+      return { ...t, episodios: t.episodios.filter(e => e.tempId !== tempIdEpisodio) };
+    }));
+  };
+
+  const atualizarEpisodio = (tempIdTemporada: number, tempIdEpisodio: number, campo: keyof EpisodioForm, valor: string | number) => {
+    setTemporadasForm(temporadasForm.map(t => {
+      if (t.tempId !== tempIdTemporada) return t;
+      return {
+        ...t,
+        episodios: t.episodios.map(e => {
+          if (e.tempId !== tempIdEpisodio) return e;
+          return { ...e, [campo]: valor };
+        }),
+      };
+    }));
+  };
+
+  const salvarTemporadas = async () => {
+    if (!serieEditando) return;
+
+    // Validação básica
+    for (const t of temporadasForm) {
+      for (const e of t.episodios) {
+        if (!e.nome.trim()) {
+          toast.error(`Episódio ${e.numeroEpisodio} da Temporada ${t.numeroTemporada} está sem nome.`);
+          return;
+        }
+      }
+    }
+
+    setSalvandoTemporadas(true);
+    try {
+      const dadosSerie = {
+        titulo: serieEditando.titulo,
+        descricao: serieEditando.descricao,
+        anoLancamento: serieEditando.anoLancamento,
+        planoMinimo: serieEditando.planoMinimo,
+        generosIds: serieEditando.generos.map(g => g.id),
+        temporadas: temporadasForm.map(t => ({
+          numeroTemporada: t.numeroTemporada,
+          episodios: t.episodios.map(e => ({
+            nome: e.nome,
+            numeroEpisodio: e.numeroEpisodio,
+            duracaoMinutos: e.duracaoMinutos,
+            trailerUrlYoutube: e.trailerUrlYoutube,
+          })),
+        })),
+      };
+
+      const formData = new FormData();
+      formData.append("dados", new Blob([JSON.stringify(dadosSerie)], { type: "application/json" }));
+      const resp = await api.put(`/series/${serieEditando.id}`, formData, { headers: { "Content-Type": "multipart/form-data" } });
+
+      setSeries(series.map(s => s.id === serieEditando.id ? resp.data : s));
+      toast.success("Temporadas salvas com sucesso!");
+      setShowTemporadasModal(false);
+    } catch (error: any) {
+      toast.error(error.response?.data?.erro || "Erro ao salvar temporadas.");
     } finally {
-      setDeletando(false);
+      setSalvandoTemporadas(false);
     }
   };
 
-  const handleChangePlano = async (serie: Serie, novoPlano: string) => {
-    try {
-      const dadosSerie = {
-        titulo: serie.titulo, descricao: serie.descricao, anoLancamento: serie.anoLancamento,
-        trailerUrlYoutube: serie.trailerUrlYoutube, planoMinimo: novoPlano, generosIds: serie.generos.map(g => g.id),
-        temporadas: []
-      };
-      const formData = new FormData();
-      formData.append("dados", new Blob([JSON.stringify(dadosSerie)], { type: "application/json" }));
-      const resp = await api.put(`/series/${serie.id}`, formData, { headers: { "Content-Type": "multipart/form-data" }});
-      setSeries(series.map(s => s.id === serie.id ? resp.data : s));
-      toast.success(`Plano atualizado para ${novoPlano}!`);
-    } catch (error) { toast.error("Erro ao alterar o plano."); }
-  };
+  // ── RENDER ────────────────────────────────────────────────────────────────
 
   return (
     <>
+      {/* Modal TMDB */}
       <CustomModal isOpen={showTmdbModal} title="Buscar Série (TMDb)" maxWidth="max-w-4xl">
         <form onSubmit={buscarNoTMDB} className="flex gap-2 mb-6">
           <input type="text" autoFocus placeholder="Digite o nome da Série (Ex: Breaking Bad, Dark)..." value={query} onChange={(e) => setQuery(e.target.value)} className="flex-grow bg-[#141414] text-white p-3 rounded-md border border-gray-700 focus:border-red-600 focus:outline-none" />
@@ -169,7 +377,7 @@ export default function AdminSeriesPage() {
                   <div className="flex flex-col justify-between flex-grow overflow-hidden">
                     <div>
                       <h4 className="text-white font-bold truncate text-sm">{serie.name}</h4>
-                      <p className="text-gray-500 text-xs mb-1">{serie.first_air_date?.substring(0,4)}</p>
+                      <p className="text-gray-500 text-xs mb-1">{serie.first_air_date?.substring(0, 4)}</p>
                       <p className="text-gray-400 text-xs line-clamp-3 leading-snug">{serie.overview || "Sem sinopse disponível."}</p>
                     </div>
                     <button onClick={() => handleImportarSerie(serie)} disabled={importandoId === serie.id} className="mt-2 text-xs font-bold text-red-500 hover:text-red-400 text-right uppercase disabled:opacity-50 flex justify-end items-center gap-2">
@@ -186,6 +394,7 @@ export default function AdminSeriesPage() {
         </div>
       </CustomModal>
 
+      {/* Modal Exclusão */}
       <CustomModal isOpen={showDeleteModal} title="Excluir Série" icon={<Trash2 className="w-8 h-8" />} centerTitle>
         <p className="text-gray-400 mb-8 leading-relaxed text-center">
           Tem certeza que deseja deletar esta série do catálogo? Esta ação apagará as temporadas, episódios e o histórico de todos os usuários.
@@ -196,6 +405,92 @@ export default function AdminSeriesPage() {
         </div>
       </CustomModal>
 
+      {/* Modal Temporadas */}
+      <CustomModal isOpen={showTemporadasModal} title={`Temporadas — ${serieEditando?.titulo}`} maxWidth="max-w-3xl">
+        <div className="max-h-[60vh] overflow-y-auto pr-1 flex flex-col gap-4 mb-6">
+          {temporadasForm.length === 0 && (
+            <p className="text-gray-500 text-sm text-center py-6">Nenhuma temporada ainda. Clique em "Adicionar Temporada".</p>
+          )}
+
+          {temporadasForm.map((temporada) => (
+            <div key={temporada.tempId} className="border border-gray-800 rounded-xl overflow-hidden">
+
+              {/* Cabeçalho da temporada */}
+              <div className="flex items-center justify-between px-4 py-3 bg-[#1a1a1a]">
+                <button
+                  onClick={() => setTemporadaAberta(temporadaAberta === temporada.tempId ? null : temporada.tempId)}
+                  className="flex items-center gap-3 flex-1 text-left"
+                >
+                  {temporadaAberta === temporada.tempId ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                  <span className="text-white font-bold">Temporada {temporada.numeroTemporada}</span>
+                  <span className="text-gray-500 text-xs">{temporada.episodios.length} episódio(s)</span>
+                </button>
+                <button onClick={() => removerTemporada(temporada.tempId)} className="text-gray-600 hover:text-red-500 transition p-1 ml-2">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Episódios */}
+              {temporadaAberta === temporada.tempId && (
+                <div className="p-4 flex flex-col gap-3">
+                  {temporada.episodios.map((ep) => (
+                    <div key={ep.tempId} className="bg-[#111] border border-gray-800 rounded-lg p-3 flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500 text-xs w-6 text-center font-bold">{ep.numeroEpisodio}</span>
+                        <input
+                          type="text"
+                          placeholder="Nome do episódio"
+                          value={ep.nome}
+                          onChange={(e) => atualizarEpisodio(temporada.tempId, ep.tempId, "nome", e.target.value)}
+                          className="flex-1 bg-[#1a1a1a] text-white text-sm p-2 rounded border border-gray-700 focus:border-red-600 focus:outline-none"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Min"
+                          value={ep.duracaoMinutos || ""}
+                          onChange={(e) => atualizarEpisodio(temporada.tempId, ep.tempId, "duracaoMinutos", parseInt(e.target.value) || 0)}
+                          className="w-16 bg-[#1a1a1a] text-white text-sm p-2 rounded border border-gray-700 focus:border-red-600 focus:outline-none text-center"
+                        />
+                        <button onClick={() => removerEpisodio(temporada.tempId, ep.tempId)} className="text-gray-600 hover:text-red-500 transition p-1">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="URL do trailer no YouTube (opcional)"
+                        value={ep.trailerUrlYoutube}
+                        onChange={(e) => atualizarEpisodio(temporada.tempId, ep.tempId, "trailerUrlYoutube", e.target.value)}
+                        className="w-full bg-[#1a1a1a] text-white text-sm p-2 rounded border border-gray-700 focus:border-red-600 focus:outline-none ml-8"
+                      />
+                    </div>
+                  ))}
+
+                  <button
+                    onClick={() => adicionarEpisodio(temporada.tempId)}
+                    className="mt-1 text-sm text-red-500 hover:text-red-400 font-semibold flex items-center gap-1 transition"
+                  >
+                    <Plus className="w-4 h-4" /> Adicionar Episódio
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={adicionarTemporada}
+          className="w-full py-3 border border-dashed border-gray-700 rounded-xl text-gray-400 hover:text-white hover:border-gray-500 transition text-sm font-semibold flex items-center justify-center gap-2 mb-4"
+        >
+          <Plus className="w-4 h-4" /> Adicionar Temporada
+        </button>
+
+        <div className="flex gap-4">
+          <LoadingButton variant="secondary" onClick={() => setShowTemporadasModal(false)}>Cancelar</LoadingButton>
+          <LoadingButton onClick={salvarTemporadas} isLoading={salvandoTemporadas} textLoading="Salvando...">Salvar Temporadas</LoadingButton>
+        </div>
+      </CustomModal>
+
+      {/* Página principal */}
       <div>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
@@ -217,6 +512,7 @@ export default function AdminSeriesPage() {
                   <TableHead className="w-[80px] text-gray-400">ID</TableHead>
                   <TableHead className="text-gray-400">Título</TableHead>
                   <TableHead className="text-gray-400">Ano</TableHead>
+                  <TableHead className="text-gray-400">Temporadas</TableHead>
                   <TableHead className="text-gray-400">Plano Mínimo</TableHead>
                   <TableHead className="text-right text-gray-400">Ações</TableHead>
                 </TableRow>
@@ -227,20 +523,26 @@ export default function AdminSeriesPage() {
                     <TableCell className="font-medium text-gray-500">#{serie.id}</TableCell>
                     <TableCell className="text-white font-bold">{serie.titulo}</TableCell>
                     <TableCell className="text-gray-400">{serie.anoLancamento}</TableCell>
+                    <TableCell className="text-gray-400">{(serie.temporadas || []).length} temp.</TableCell>
                     <TableCell>
                       <div className="relative inline-block">
-                        <select value={serie.planoMinimo || "BASICO"} onChange={(e) => handleChangePlano(serie, e.target.value)} className={`appearance-none cursor-pointer pr-6 pl-2 py-1 rounded text-[10px] font-extrabold focus:outline-none focus:ring-1 focus:ring-red-600 transition-colors ${serie.planoMinimo === 'PREMIUM' ? 'bg-yellow-500 text-black' : serie.planoMinimo === 'PADRAO' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'}`}>
+                        <select value={serie.planoMinimo || "BASICO"} onChange={(e) => handleChangePlano(serie, e.target.value)} className={`appearance-none cursor-pointer pr-6 pl-2 py-1 rounded text-[10px] font-extrabold focus:outline-none focus:ring-1 focus:ring-red-600 transition-colors ${serie.planoMinimo === "PREMIUM" ? "bg-yellow-500 text-black" : serie.planoMinimo === "PADRAO" ? "bg-blue-600 text-white" : "bg-gray-700 text-white"}`}>
                           <option value="BASICO" className="bg-[#141414] text-gray-300 font-bold">BÁSICO</option>
                           <option value="PADRAO" className="bg-[#141414] text-gray-300 font-bold">PADRÃO</option>
                           <option value="PREMIUM" className="bg-[#141414] text-gray-300 font-bold">PREMIUM</option>
                         </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-1 flex items-center px-1"><svg className={`fill-current h-3 w-3 ${serie.planoMinimo === 'PREMIUM' ? 'text-black' : 'text-white'}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg></div>
+                        <div className="pointer-events-none absolute inset-y-0 right-1 flex items-center px-1"><svg className={`fill-current h-3 w-3 ${serie.planoMinimo === "PREMIUM" ? "text-black" : "text-white"}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg></div>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <button onClick={() => abrirModalDeletar(serie.id)} className="text-gray-500 hover:text-red-500 p-2 transition">
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => abrirModalTemporadas(serie)} className="text-gray-500 hover:text-blue-400 p-2 transition" title="Gerenciar Temporadas">
+                          <ListVideo className="w-5 h-5" />
+                        </button>
+                        <button onClick={() => abrirModalDeletar(serie.id)} className="text-gray-500 hover:text-red-500 p-2 transition" title="Excluir Série">
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

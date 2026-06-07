@@ -3,21 +3,29 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/services/api";
-import { Filme, Serie } from "@/types/conteudo";
+import { Filme, Serie, Episodio } from "@/types/conteudo";
 import PageWrapper from "@/components/PageWrapper";
 import CustomModal from "@/components/shared/CustomModal";
 import LoadingButton from "@/components/shared/LoadingButton";
-import SecaoAvaliacoes from "@/components/conteudo/SecaoAvaliacoes"; // Componente Isolado!
-import BotaoMinhaLista from "@/components/conteudo/BotaoMinhaLista"; // Componente Isolado!
-import { Lock } from "lucide-react";
+import SecaoAvaliacoes from "@/components/conteudo/SecaoAvaliacoes";
+import BotaoMinhaLista from "@/components/conteudo/BotaoMinhaLista";
+import { Lock, Play, Clock, ChevronDown } from "lucide-react";
+
+function isSerie(conteudo: Filme | Serie): conteudo is Serie {
+  return "temporadas" in conteudo;
+}
 
 export default function ConteudoDetalhesPage() {
   const { id } = useParams();
   const router = useRouter();
-  
+
   const [conteudo, setConteudo] = useState<Filme | Serie | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  // Para séries: controla qual temporada está expandida e qual episódio está tocando
+  const [temporadaAberta, setTemporadaAberta] = useState<number>(0);
+  const [episodioAtivo, setEpisodioAtivo] = useState<Episodio | null>(null);
 
   useEffect(() => {
     const buscarDetalhes = async () => {
@@ -44,19 +52,36 @@ export default function ConteudoDetalhesPage() {
   }, [id, router]);
 
   const getYouTubeId = (url: string) => {
-    const match = url?.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
+    if (!url) return null;
+    const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
-  if (carregando) return <div className="min-h-screen bg-[#141414] text-white flex items-center justify-center">Carregando conteúdo...</div>;
-  if (!conteudo) return <div className="min-h-screen bg-[#141414] text-white flex items-center justify-center">Conteúdo não encontrado.</div>;
+  if (carregando) return (
+    <div className="min-h-screen bg-[#141414] text-white flex items-center justify-center">
+      Carregando conteúdo...
+    </div>
+  );
+  if (!conteudo) return (
+    <div className="min-h-screen bg-[#141414] text-white flex items-center justify-center">
+      Conteúdo não encontrado.
+    </div>
+  );
 
-  const ytId = getYouTubeId(conteudo.trailerUrlYoutube);
   const planoMinimoReal = conteudo.planoMinimo || "BASICO";
+  const ehSerie = isSerie(conteudo);
+
+  // Para filme usa trailerUrlYoutube do próprio conteúdo.
+  // Para série usa o trailer do episódio ativo (se houver), senão não exibe trailer.
+  const urlTrailerAtivo = ehSerie
+    ? (episodioAtivo?.trailerUrlYoutube ?? null)
+    : (conteudo as Filme).trailerUrlYoutube;
+
+  const ytId = getYouTubeId(urlTrailerAtivo ?? "");
 
   return (
     <PageWrapper hasNavbar={true} className="p-0">
-      
+
       <CustomModal isOpen={showUpgradeModal} title="Acesso Restrito" icon={<Lock className="w-8 h-8" />} centerTitle>
         <p className="text-gray-400 mb-8 leading-relaxed text-center">
           Conteúdo exclusivo para assinantes <strong className="text-white">{planoMinimoReal}</strong>.
@@ -67,22 +92,44 @@ export default function ConteudoDetalhesPage() {
         </div>
       </CustomModal>
 
+      {/* Player / Trailer */}
       <div className="relative w-full h-[60vh] md:h-[80vh] bg-black pt-20">
         {ytId && !showUpgradeModal ? (
-          <iframe className="w-full h-full border-none" src={`https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&modestbranding=1`} title="Trailer" allowFullScreen></iframe>
+          <iframe
+            className="w-full h-full border-none"
+            src={`https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&modestbranding=1`}
+            title={episodioAtivo ? episodioAtivo.nome : conteudo.titulo}
+            allowFullScreen
+          />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 bg-gray-900/20"><span className="text-4xl mb-2">🎬</span><p>Trailer bloqueado ou não disponível.</p></div>
+          <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 bg-gray-900/20">
+            <span className="text-4xl mb-2">🎬</span>
+            <p>
+              {ehSerie && !episodioAtivo
+                ? "Selecione um episódio para assistir ao trailer."
+                : "Trailer bloqueado ou não disponível."}
+            </p>
+          </div>
         )}
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-8 w-full pb-20">
+
+        {/* Informações gerais */}
         <div className="flex flex-col md:flex-row justify-between items-start gap-8 border-b border-gray-800 pb-10">
           <div className="flex-1">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">{conteudo.titulo}</h1>
             <div className="flex items-center gap-4 text-gray-300 font-medium mb-6">
               <span className="text-green-500 font-bold">98% Relevante</span>
               <span>{conteudo.anoLancamento}</span>
-              <span className="border border-gray-500 px-2 py-0.5 rounded text-xs font-bold">Plano {planoMinimoReal}</span>
+              <span className="border border-gray-500 px-2 py-0.5 rounded text-xs font-bold">
+                Plano {planoMinimoReal}
+              </span>
+              {ehSerie && (
+                <span className="text-gray-400 text-sm">
+                  {(conteudo as Serie).temporadas?.length ?? 0} temporada(s)
+                </span>
+              )}
             </div>
             <p className="text-lg text-gray-200 max-w-3xl leading-relaxed">{conteudo.descricao}</p>
           </div>
@@ -91,6 +138,99 @@ export default function ConteudoDetalhesPage() {
             <BotaoMinhaLista conteudoId={id as string} />
           </div>
         </div>
+
+        {/* Seção de temporadas e episódios — apenas para séries */}
+        {ehSerie && (
+          <div className="mt-10 mb-10 border-b border-gray-800 pb-10">
+            <h2 className="text-2xl font-bold text-white mb-6">Episódios</h2>
+
+            {(conteudo as Serie).temporadas?.length > 0 ? (
+              <div className="flex flex-col gap-4">
+                {(conteudo as Serie).temporadas
+                  .slice()
+                  .sort((a, b) => a.numeroTemporada - b.numeroTemporada)
+                  .map((temporada, idx) => (
+                    <div key={temporada.id} className="rounded-xl border border-gray-800 overflow-hidden">
+
+                      {/* Cabeçalho da temporada — clicável para expandir/recolher */}
+                      <button
+                        onClick={() => setTemporadaAberta(temporadaAberta === idx ? -1 : idx)}
+                        className="w-full flex items-center justify-between px-6 py-4 bg-[#1a1a1a] hover:bg-[#222] transition-colors text-left"
+                      >
+                        <span className="text-white font-bold text-lg">
+                          Temporada {temporada.numeroTemporada}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-gray-500 text-sm">
+                            {temporada.episodios?.length ?? 0} episódio(s)
+                          </span>
+                          <ChevronDown
+                            className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${temporadaAberta === idx ? "rotate-180" : ""}`}
+                          />
+                        </div>
+                      </button>
+
+                      {/* Lista de episódios */}
+                      {temporadaAberta === idx && (
+                        <div className="divide-y divide-gray-800/60">
+                          {temporada.episodios?.length > 0 ? (
+                            temporada.episodios
+                              .slice()
+                              .sort((a, b) => a.numeroEpisodio - b.numeroEpisodio)
+                              .map((ep) => {
+                                const ativo = episodioAtivo?.id === ep.id;
+                                return (
+                                  <div
+                                    key={ep.id}
+                                    onClick={() => setEpisodioAtivo(ativo ? null : ep)}
+                                    className={`flex items-center gap-5 px-6 py-4 cursor-pointer transition-colors group ${
+                                      ativo ? "bg-red-600/10 border-l-4 border-red-600" : "hover:bg-[#1f1f1f]"
+                                    }`}
+                                  >
+                                    {/* Número / ícone de play */}
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm transition-colors ${
+                                      ativo ? "bg-red-600 text-white" : "bg-gray-800 text-gray-400 group-hover:bg-gray-700"
+                                    }`}>
+                                      {ativo ? <Play className="w-4 h-4" /> : ep.numeroEpisodio}
+                                    </div>
+
+                                    {/* Info do episódio */}
+                                    <div className="flex-1 min-w-0">
+                                      <p className={`font-semibold truncate ${ativo ? "text-red-400" : "text-white"}`}>
+                                        {ep.nome}
+                                      </p>
+                                      {ep.duracaoMinutos && (
+                                        <p className="text-gray-500 text-sm flex items-center gap-1 mt-0.5">
+                                          <Clock className="w-3.5 h-3.5" />
+                                          {ep.duracaoMinutos} min
+                                        </p>
+                                      )}
+                                    </div>
+
+                                    {/* Indicador de trailer */}
+                                    {ep.trailerUrlYoutube && (
+                                      <span className="text-xs text-gray-500 group-hover:text-red-400 transition-colors flex-shrink-0">
+                                        {ativo ? "Assistindo trailer" : "Ver trailer"}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })
+                          ) : (
+                            <p className="px-6 py-4 text-gray-500 text-sm">
+                              Nenhum episódio cadastrado nesta temporada.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <p className="text-gray-500">Nenhuma temporada cadastrada para esta série.</p>
+            )}
+          </div>
+        )}
 
         <SecaoAvaliacoes conteudoId={id as string} />
       </div>
