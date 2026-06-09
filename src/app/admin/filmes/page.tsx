@@ -19,14 +19,12 @@ export default function AdminFilmesPage() {
   const [generosLocais, setGenerosLocais] = useState<Genero[]>([]);
   const [carregando, setCarregando] = useState(true);
 
-  // Estados Modal TMDb
   const [showTmdbModal, setShowTmdbModal] = useState(false);
   const [query, setQuery] = useState("");
   const [resultadosTmdb, setResultadosTmdb] = useState<TMDBResult[]>([]);
   const [buscandoTmdb, setBuscandoTmdb] = useState(false);
   const [importandoId, setImportandoId] = useState<number | null>(null);
 
-  // Estados Modal Exclusão
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [idParaDeletar, setIdParaDeletar] = useState<number | null>(null);
   const [deletando, setDeletando] = useState(false);
@@ -44,11 +42,25 @@ export default function AdminFilmesPage() {
       try {
         const respGeneros = await api.get<Genero[]>("/generos");
         setGenerosLocais(respGeneros.data);
-      } catch (error) { console.error("Erro ao carregar gêneros."); }
+      } catch (error) {}
       buscarFilmesBanco();
     };
     buscarDadosIniciais();
   }, []);
+
+  const buscarMelhorTrailer = async (tmdbId: string | number, tipo: 'movie' | 'tv', tmdbKey: string) => {
+    const buscar = async (lang: string) => {
+      try {
+        const res = await axios.get(`https://api.themoviedb.org/3/${tipo}/${tmdbId}/videos?api_key=${tmdbKey}&language=${lang}`);
+        const videos = res.data.results || [];
+        let vid = videos.find((v: any) => v.site === "YouTube" && v.type === "Trailer");
+        if (!vid) vid = videos.find((v: any) => v.site === "YouTube" && v.type === "Teaser");
+        if (!vid) vid = videos.find((v: any) => v.site === "YouTube"); 
+        return vid ? `https://www.youtube.com/watch?v=${vid.key}` : null;
+      } catch { return null; }
+    };
+    return (await buscar("pt-BR")) || (await buscar("en-US")) || "";
+  };
 
   const buscarNoTMDB = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,17 +84,10 @@ export default function AdminFilmesPage() {
     setImportandoId(tmdbFilme.id);
     try {
       const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-      const detalhesRes = await axios.get(`https://api.themoviedb.org/3/movie/${tmdbFilme.id}?api_key=${TMDB_KEY}&language=pt-BR`);
-      const detalhes = detalhesRes.data;
+      if (!TMDB_KEY) throw new Error("API Key não encontrada.");
 
-      const videosRes = await axios.get(`https://api.themoviedb.org/3/movie/${tmdbFilme.id}/videos?api_key=${TMDB_KEY}&language=pt-BR`);
-      let trailerUrl = "";
-      let trailer = videosRes.data.results.find((v: any) => v.site === "YouTube" && v.type === "Trailer");
-      if (!trailer) {
-        const videosEn = await axios.get(`https://api.themoviedb.org/3/movie/${tmdbFilme.id}/videos?api_key=${TMDB_KEY}&language=en-US`);
-        trailer = videosEn.data.results.find((v: any) => v.site === "YouTube" && v.type === "Trailer");
-      }
-      if (trailer) trailerUrl = `https://www.youtube.com/watch?v=${trailer.key}`;
+      const detalhes = (await axios.get(`https://api.themoviedb.org/3/movie/${tmdbFilme.id}?api_key=${TMDB_KEY}&language=pt-BR`)).data;
+      const trailerUrl = await buscarMelhorTrailer(tmdbFilme.id, 'movie', TMDB_KEY);
 
       const generosIds: number[] = [];
       if (detalhes.genres) {
@@ -156,7 +161,6 @@ export default function AdminFilmesPage() {
 
   return (
     <>
-      {/* MODAL TMDb */}
       <CustomModal isOpen={showTmdbModal} title="Buscar Filme (TMDb)" maxWidth="max-w-4xl">
         <form onSubmit={buscarNoTMDB} className="flex gap-2 mb-6">
           <input type="text" autoFocus placeholder="Digite o nome (Ex: Vingadores, Matrix)..." value={query} onChange={(e) => setQuery(e.target.value)} className="flex-grow bg-[#141414] text-white p-3 rounded-md border border-gray-700 focus:border-red-600 focus:outline-none" />
@@ -190,10 +194,9 @@ export default function AdminFilmesPage() {
         </div>
       </CustomModal>
 
-      {/* MODAL DE DELETAR */}
       <CustomModal isOpen={showDeleteModal} title="Excluir Filme" icon={<Trash2 className="w-8 h-8" />} centerTitle>
         <p className="text-gray-400 mb-8 leading-relaxed text-center">
-          Tem certeza que deseja deletar este filme do catálogo? Esta ação apagará o histórico e as listas de todos os usuários que o salvaram.
+          Tem certeza que deseja deletar este filme do catálogo? Esta ação apagará o histórico e as listas de todos os usuários.
         </p>
         <div className="flex gap-4 w-full">
           <LoadingButton variant="secondary" onClick={() => setShowDeleteModal(false)}>Cancelar</LoadingButton>
@@ -201,7 +204,6 @@ export default function AdminFilmesPage() {
         </div>
       </CustomModal>
 
-      {/* TELA PRINCIPAL DO ADMIN */}
       <div>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>

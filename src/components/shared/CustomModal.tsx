@@ -14,25 +14,32 @@ export default function CustomModal({ isOpen, title, icon, children, maxWidth = 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md px-4">
+        // Padding (py-6) garante que o modal não grude no topo/fundo da tela
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md px-4 py-6">
           <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className={`bg-[#111111] border border-gray-800 p-8 rounded-2xl w-full shadow-2xl ${maxWidth}`}
+            // MÁGICA AQUI: max-h-[90vh] impede de vazar da tela. overflow-y-auto cria o scroll interno!
+            className={`bg-[#111111] border border-gray-800 p-6 md:p-8 rounded-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar relative flex flex-col ${maxWidth}`}
           >
             {icon && (
-              <div className="w-16 h-16 bg-red-900/20 border border-red-500/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="w-16 h-16 bg-red-900/20 border border-red-500/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 flex-shrink-0">
                 {icon}
               </div>
             )}
             {title && (
-              <h2 className={`text-2xl font-bold text-white mb-6 ${centerTitle ? 'text-center' : ''}`}>
+              <h2 className={`text-2xl font-bold text-white mb-6 flex-shrink-0 ${centerTitle ? 'text-center' : ''}`}>
                 {title}
               </h2>
             )}
-            {children}
+            
+            {/* O conteúdo do Modal */}
+            <div className="flex-grow">
+              {children}
+            </div>
+            
           </motion.div>
         </div>
       )}
