@@ -54,6 +54,13 @@ export default function AdminSeriesPage() {
   const [salvandoTemporadas, setSalvandoTemporadas] = useState(false);
   const [temporadaAberta, setTemporadaAberta] = useState<number | null>(null);
 
+  // Reimportar temporadas do TMDB dentro do modal
+  const [showReimportarBusca, setShowReimportarBusca] = useState(false);
+  const [queryReimportar, setQueryReimportar] = useState("");
+  const [resultadosReimportar, setResultadosReimportar] = useState<TMDBTvResult[]>([]);
+  const [buscandoReimportar, setBuscandoReimportar] = useState(false);
+  const [reimportandoId, setReimportandoId] = useState<number | null>(null);
+
   const buscarSeriesBanco = async () => {
     try {
       const resp = await api.get<Serie[]>("/series");
@@ -231,6 +238,82 @@ export default function AdminSeriesPage() {
     } finally { setDeletando(false); }
   };
 
+  // ── REIMPORTAR TEMPORADAS DO TMDB ───────────────────────────────────────────
+
+  const buscarParaReimportar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!queryReimportar.trim()) return;
+    setBuscandoReimportar(true);
+    try {
+      const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+      const resp = await axios.get(`https://api.themoviedb.org/3/search/tv?api_key=${TMDB_KEY}&query=${encodeURIComponent(queryReimportar)}&language=pt-BR`);
+      setResultadosReimportar(resp.data.results);
+    } catch { toast.error("Erro ao buscar no TMDb."); }
+    finally { setBuscandoReimportar(false); }
+  };
+
+  const handleReimportarTemporadas = async (tmdbSerie: TMDBTvResult) => {
+    if (!serieEditando) return;
+    setReimportandoId(tmdbSerie.id);
+    try {
+      const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+      const detalhesRes = await axios.get(`https://api.themoviedb.org/3/tv/${tmdbSerie.id}?api_key=${TMDB_KEY}&language=pt-BR`);
+      const detalhes = detalhesRes.data;
+      const temporadasValidas = (detalhes.seasons || []).filter((s: any) => s.season_number > 0);
+
+      const temporadas: TemporadaForm[] = await Promise.all(
+        temporadasValidas.map(async (season: any) => {
+          const seasonRes = await axios.get(
+            `https://api.themoviedb.org/3/tv/${tmdbSerie.id}/season/${season.season_number}?api_key=${TMDB_KEY}&language=pt-BR`
+          );
+          const episodiosTMDB: any[] = seasonRes.data.episodes || [];
+          const episodios: EpisodioForm[] = [];
+          for (let i = 0; i < episodiosTMDB.length; i += 5) {
+            const lote = episodiosTMDB.slice(i, i + 5);
+            const resultados = await Promise.all(
+              lote.map(async (ep: any) => {
+                const trailerUrl = await buscarTrailerEpisodio(tmdbSerie.id, season.season_number, ep.episode_number, TMDB_KEY!);
+                return {
+                  tempId: novoTempId(),
+                  nome: ep.name || `Episódio ${ep.episode_number}`,
+                  numeroEpisodio: ep.episode_number,
+                  duracaoMinutos: ep.runtime || 0,
+                  trailerUrlYoutube: trailerUrl,
+                };
+              })
+            );
+            episodios.push(...resultados);
+          }
+          return { tempId: novoTempId(), numeroTemporada: season.season_number, episodios };
+        })
+      );
+
+      // Buscar trailer da série
+      let trailerSerie = "";
+      for (const lang of ["pt-BR", "en-US"]) {
+        try {
+          const videosRes = await axios.get(`https://api.themoviedb.org/3/tv/${tmdbSerie.id}/videos?api_key=${TMDB_KEY}&language=${lang}`);
+          const trailer = videosRes.data.results?.find((v: any) => v.site === "YouTube" && v.type === "Trailer");
+          if (trailer) { trailerSerie = `https://www.youtube.com/watch?v=${trailer.key}`; break; }
+        } catch { /* sem trailer */ }
+      }
+
+      // Atualiza serieEditando com o trailer encontrado
+      if (trailerSerie) {
+        setSerieEditando(prev => prev ? { ...prev, trailerUrlYoutube: trailerSerie } : prev);
+      }
+
+      setTemporadasForm(temporadas);
+      setTemporadaAberta(temporadas.length > 0 ? temporadas[0].tempId : null);
+      setShowReimportarBusca(false);
+      setQueryReimportar("");
+      setResultadosReimportar([]);
+      const totalEps = temporadas.reduce((acc, t) => acc + t.episodios.length, 0);
+      toast.success(`${temporadas.length} temporada(s) e ${totalEps} episódio(s) carregados! Clique em Salvar para confirmar.`);
+    } catch { toast.error("Erro ao reimportar do TMDb."); }
+    finally { setReimportandoId(null); }
+  };
+
   // ── TEMPORADAS MODAL ──────────────────────────────────────────────────────
 
   const abrirModalTemporadas = (serie: Serie) => {
@@ -330,6 +413,7 @@ export default function AdminSeriesPage() {
         descricao: serieEditando.descricao,
         anoLancamento: serieEditando.anoLancamento,
         planoMinimo: serieEditando.planoMinimo,
+        trailerUrlYoutube: serieEditando.trailerUrlYoutube ?? "",
         generosIds: serieEditando.generos.map(g => g.id),
         temporadas: temporadasForm.map(t => ({
           numeroTemporada: t.numeroTemporada,
@@ -407,9 +491,69 @@ export default function AdminSeriesPage() {
 
       {/* Modal Temporadas */}
       <CustomModal isOpen={showTemporadasModal} title={`Temporadas — ${serieEditando?.titulo}`} maxWidth="max-w-3xl">
+        {/* Painel de reimportação do TMDB */}
+        {showReimportarBusca ? (
+          <div className="mb-4">
+            <form onSubmit={buscarParaReimportar} className="flex gap-2 mb-3">
+              <input
+                type="text" autoFocus
+                placeholder={`Buscar "${serieEditando?.titulo}" no TMDb...`}
+                value={queryReimportar}
+                onChange={(e) => setQueryReimportar(e.target.value)}
+                className="flex-1 bg-[#141414] text-white text-sm p-2 rounded border border-gray-700 focus:border-red-600 focus:outline-none"
+              />
+              <button type="submit" disabled={buscandoReimportar} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded font-bold disabled:opacity-50 flex items-center gap-1">
+                {buscandoReimportar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              </button>
+              <button type="button" onClick={() => { setShowReimportarBusca(false); setResultadosReimportar([]); setQueryReimportar(""); }} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm rounded">
+                Cancelar
+              </button>
+            </form>
+            <div className="max-h-52 overflow-y-auto flex flex-col gap-2">
+              {resultadosReimportar.map(r => (
+                <div key={r.id} className="flex items-center gap-3 bg-[#141414] border border-gray-800 rounded-lg p-2 hover:border-gray-600 transition">
+                  {r.poster_path && <img src={`https://image.tmdb.org/t/p/w92${r.poster_path}`} alt="" className="w-10 h-14 object-cover rounded" />}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-bold truncate">{r.name}</p>
+                    <p className="text-gray-500 text-xs">{r.first_air_date?.substring(0, 4)}</p>
+                  </div>
+                  <button
+                    onClick={() => handleReimportarTemporadas(r)}
+                    disabled={reimportandoId === r.id}
+                    className="text-xs font-bold text-red-500 hover:text-red-400 flex items-center gap-1 disabled:opacity-50 flex-shrink-0"
+                  >
+                    {reimportandoId === r.id ? <><Loader2 className="w-3 h-3 animate-spin" /> Importando...</> : "Usar esta"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => { setShowReimportarBusca(true); setQueryReimportar(serieEditando?.titulo || ""); }}
+            className="w-full py-2 mb-4 border border-dashed border-blue-800 rounded-xl text-blue-400 hover:text-blue-300 hover:border-blue-600 transition text-sm font-semibold flex items-center justify-center gap-2"
+          >
+            <Search className="w-4 h-4" /> Preencher temporadas automaticamente pelo TMDb
+          </button>
+        )}
+
+        {/* Campo de trailer da série */}
+        <div className="mb-4">
+          <label className="text-gray-400 text-xs font-semibold uppercase tracking-wide mb-1 block">
+            Trailer da Série (URL do YouTube)
+          </label>
+          <input
+            type="text"
+            placeholder="https://www.youtube.com/watch?v=..."
+            value={serieEditando?.trailerUrlYoutube ?? ""}
+            onChange={(e) => setSerieEditando(prev => prev ? { ...prev, trailerUrlYoutube: e.target.value } : prev)}
+            className="w-full bg-[#141414] text-white text-sm p-2 rounded border border-gray-700 focus:border-red-600 focus:outline-none"
+          />
+        </div>
+
         <div className="max-h-[60vh] overflow-y-auto pr-1 flex flex-col gap-4 mb-6">
           {temporadasForm.length === 0 && (
-            <p className="text-gray-500 text-sm text-center py-6">Nenhuma temporada ainda. Clique em "Adicionar Temporada".</p>
+            <p className="text-gray-500 text-sm text-center py-6">Nenhuma temporada ainda. Clique em "Adicionar Temporada" ou use o botão acima.</p>
           )}
 
           {temporadasForm.map((temporada) => (

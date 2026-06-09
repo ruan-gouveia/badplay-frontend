@@ -23,7 +23,6 @@ export default function ConteudoDetalhesPage() {
   const [carregando, setCarregando] = useState(true);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  // Para séries: controla qual temporada está expandida e qual episódio está tocando
   const [temporadaAberta, setTemporadaAberta] = useState<number>(0);
   const [episodioAtivo, setEpisodioAtivo] = useState<Episodio | null>(null);
 
@@ -71,13 +70,18 @@ export default function ConteudoDetalhesPage() {
   const planoMinimoReal = conteudo.planoMinimo || "BASICO";
   const ehSerie = isSerie(conteudo);
 
-  // Para filme usa trailerUrlYoutube do próprio conteúdo.
-  // Para série usa o trailer do episódio ativo (se houver), senão não exibe trailer.
-  const urlTrailerAtivo = ehSerie
-    ? (episodioAtivo?.trailerUrlYoutube ?? null)
-    : (conteudo as Filme).trailerUrlYoutube;
+  // Trailer ativo: episódio selecionado → trailer do ep; senão → trailer da série (ou filme)
+  const trailerEpisodio = episodioAtivo?.trailerUrlYoutube ?? null;
+  const trailerSerie = ehSerie ? (conteudo as Serie).trailerUrlYoutube ?? null : null;
+  const trailerFilme = !ehSerie ? (conteudo as Filme).trailerUrlYoutube : null;
+  const urlTrailerAtivo = trailerEpisodio || trailerSerie || trailerFilme;
 
   const ytId = getYouTubeId(urlTrailerAtivo ?? "");
+
+  // Título do player
+  const tituloPlayer = episodioAtivo
+    ? `${conteudo.titulo} — ${episodioAtivo.nome}`
+    : conteudo.titulo;
 
   return (
     <PageWrapper hasNavbar={true} className="p-0">
@@ -92,23 +96,20 @@ export default function ConteudoDetalhesPage() {
         </div>
       </CustomModal>
 
-      {/* Player / Trailer */}
+      {/* Player */}
       <div className="relative w-full h-[60vh] md:h-[80vh] bg-black pt-20">
         {ytId && !showUpgradeModal ? (
           <iframe
+            key={ytId}
             className="w-full h-full border-none"
             src={`https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&modestbranding=1`}
-            title={episodioAtivo ? episodioAtivo.nome : conteudo.titulo}
+            title={tituloPlayer}
             allowFullScreen
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 bg-gray-900/20">
             <span className="text-4xl mb-2">🎬</span>
-            <p>
-              {ehSerie && !episodioAtivo
-                ? "Selecione um episódio para assistir ao trailer."
-                : "Trailer bloqueado ou não disponível."}
-            </p>
+            <p>Trailer não disponível.</p>
           </div>
         )}
       </div>
@@ -139,10 +140,20 @@ export default function ConteudoDetalhesPage() {
           </div>
         </div>
 
-        {/* Seção de temporadas e episódios — apenas para séries */}
+        {/* Temporadas e episódios */}
         {ehSerie && (
           <div className="mt-10 mb-10 border-b border-gray-800 pb-10">
-            <h2 className="text-2xl font-bold text-white mb-6">Episódios</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Episódios</h2>
+              {episodioAtivo && (
+                <button
+                  onClick={() => setEpisodioAtivo(null)}
+                  className="text-sm text-gray-500 hover:text-white transition"
+                >
+                  ← Voltar ao trailer da série
+                </button>
+              )}
+            </div>
 
             {(conteudo as Serie).temporadas?.length > 0 ? (
               <div className="flex flex-col gap-4">
@@ -152,7 +163,6 @@ export default function ConteudoDetalhesPage() {
                   .map((temporada, idx) => (
                     <div key={temporada.id} className="rounded-xl border border-gray-800 overflow-hidden">
 
-                      {/* Cabeçalho da temporada — clicável para expandir/recolher */}
                       <button
                         onClick={() => setTemporadaAberta(temporadaAberta === idx ? -1 : idx)}
                         className="w-full flex items-center justify-between px-6 py-4 bg-[#1a1a1a] hover:bg-[#222] transition-colors text-left"
@@ -170,7 +180,6 @@ export default function ConteudoDetalhesPage() {
                         </div>
                       </button>
 
-                      {/* Lista de episódios */}
                       {temporadaAberta === idx && (
                         <div className="divide-y divide-gray-800/60">
                           {temporada.episodios?.length > 0 ? (
@@ -182,24 +191,25 @@ export default function ConteudoDetalhesPage() {
                                 return (
                                   <div
                                     key={ep.id}
-                                    onClick={() => setEpisodioAtivo(ativo ? null : ep)}
+                                    onClick={() => {
+                                      setEpisodioAtivo(ativo ? null : ep);
+                                      window.scrollTo({ top: 0, behavior: "smooth" });
+                                    }}
                                     className={`flex items-center gap-5 px-6 py-4 cursor-pointer transition-colors group ${
                                       ativo ? "bg-red-600/10 border-l-4 border-red-600" : "hover:bg-[#1f1f1f]"
                                     }`}
                                   >
-                                    {/* Número / ícone de play */}
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm transition-colors ${
                                       ativo ? "bg-red-600 text-white" : "bg-gray-800 text-gray-400 group-hover:bg-gray-700"
                                     }`}>
                                       {ativo ? <Play className="w-4 h-4" /> : ep.numeroEpisodio}
                                     </div>
 
-                                    {/* Info do episódio */}
                                     <div className="flex-1 min-w-0">
                                       <p className={`font-semibold truncate ${ativo ? "text-red-400" : "text-white"}`}>
                                         {ep.nome}
                                       </p>
-                                      {ep.duracaoMinutos && (
+                                      {ep.duracaoMinutos > 0 && (
                                         <p className="text-gray-500 text-sm flex items-center gap-1 mt-0.5">
                                           <Clock className="w-3.5 h-3.5" />
                                           {ep.duracaoMinutos} min
@@ -207,7 +217,6 @@ export default function ConteudoDetalhesPage() {
                                       )}
                                     </div>
 
-                                    {/* Indicador de trailer */}
                                     {ep.trailerUrlYoutube && (
                                       <span className="text-xs text-gray-500 group-hover:text-red-400 transition-colors flex-shrink-0">
                                         {ativo ? "Assistindo trailer" : "Ver trailer"}
