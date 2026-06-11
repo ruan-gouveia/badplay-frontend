@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { api } from "@/services/api";
 import { Filme, Genero } from "@/types/conteudo";
 import axios from "axios";
@@ -10,14 +11,21 @@ import CustomModal from "@/components/shared/CustomModal";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-interface TMDBResult {
-  id: number; title: string; release_date: string; poster_path: string; overview: string;
-}
+interface TMDBResult { id: number; title: string; release_date: string; poster_path: string; overview: string; }
+
+// Fetcher Blindado: Aceita array direto ou paginado
+const fetcher = (url: string) => api.get(url).then(res => {
+  if (Array.isArray(res.data)) return res.data;
+  if (res.data && Array.isArray(res.data.content)) return res.data.content;
+  return [];
+});
 
 export default function AdminFilmesPage() {
-  const [filmes, setFilmes] = useState<Filme[]>([]);
-  const [generosLocais, setGenerosLocais] = useState<Genero[]>([]);
-  const [carregando, setCarregando] = useState(true);
+  const { data: filmesData, isLoading: carregando, mutate: mutateFilmes } = useSWR<Filme[]>("/filmes", fetcher);
+  const { data: generosLocaisCache } = useSWR<Genero[]>("/generos", fetcher);
+
+  const filmes = filmesData ? [...filmesData].sort((a, b) => b.id - a.id) : [];
+  const generosLocais = generosLocaisCache || [];
 
   const [showTmdbModal, setShowTmdbModal] = useState(false);
   const [query, setQuery] = useState("");
@@ -28,25 +36,6 @@ export default function AdminFilmesPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [idParaDeletar, setIdParaDeletar] = useState<number | null>(null);
   const [deletando, setDeletando] = useState(false);
-
-  const buscarFilmesBanco = async () => {
-    try {
-      const resp = await api.get<Filme[]>("/filmes");
-      setFilmes(resp.data.sort((a, b) => b.id - a.id));
-    } catch (error) { toast.error("Erro ao buscar filmes do banco."); }
-    finally { setCarregando(false); }
-  };
-
-  useEffect(() => {
-    const buscarDadosIniciais = async () => {
-      try {
-        const respGeneros = await api.get<Genero[]>("/generos");
-        setGenerosLocais(respGeneros.data);
-      } catch (error) {}
-      buscarFilmesBanco();
-    };
-    buscarDadosIniciais();
-  }, []);
 
   const buscarMelhorTrailer = async (tmdbId: string | number, tipo: 'movie' | 'tv', tmdbKey: string) => {
     const buscar = async (lang: string) => {
@@ -118,7 +107,7 @@ export default function AdminFilmesPage() {
       formData.append("capa", imageFile);
 
       const resp = await api.post("/filmes", formData, { headers: { "Content-Type": "multipart/form-data" }});
-      setFilmes([resp.data, ...filmes]);
+      mutateFilmes([resp.data, ...filmes], false);
       toast.success(`${detalhes.title} importado com sucesso!`);
     } catch (error: any) { toast.error(error.message || "Erro ao importar."); } 
     finally { setImportandoId(null); }
@@ -134,7 +123,7 @@ export default function AdminFilmesPage() {
     setDeletando(true);
     try {
       await api.delete(`/filmes/${idParaDeletar}`);
-      setFilmes(filmes.filter(f => f.id !== idParaDeletar));
+      mutateFilmes(filmes.filter(f => f.id !== idParaDeletar), false);
       toast.success("Filme removido do catálogo!");
       setShowDeleteModal(false);
     } catch (error: any) {
@@ -154,7 +143,7 @@ export default function AdminFilmesPage() {
       const formData = new FormData();
       formData.append("dados", new Blob([JSON.stringify(dadosFilme)], { type: "application/json" }));
       const resp = await api.put(`/filmes/${filme.id}`, formData, { headers: { "Content-Type": "multipart/form-data" }});
-      setFilmes(filmes.map(f => f.id === filme.id ? resp.data : f));
+      mutateFilmes(filmes.map(f => f.id === filme.id ? resp.data : f), false);
       toast.success(`Plano atualizado para ${novoPlano}!`);
     } catch (error) { toast.error("Erro ao alterar o plano."); }
   };
@@ -164,7 +153,7 @@ export default function AdminFilmesPage() {
       <CustomModal isOpen={showTmdbModal} title="Buscar Filme (TMDb)" maxWidth="max-w-4xl">
         <form onSubmit={buscarNoTMDB} className="flex gap-2 mb-6">
           <input type="text" autoFocus placeholder="Digite o nome (Ex: Vingadores, Matrix)..." value={query} onChange={(e) => setQuery(e.target.value)} className="flex-grow bg-[#141414] text-white p-3 rounded-md border border-gray-700 focus:border-red-600 focus:outline-none" />
-          <LoadingButton type="submit" isLoading={buscandoTmdb} textLoading="Buscando..." className="!w-auto px-6"><Search className="w-5 h-5 mr-2" /> Buscar</LoadingButton>
+          <LoadingButton type="submit" isLoading={buscandoTmdb} textLoading="..." className="!w-auto px-6"><Search className="w-5 h-5 mr-2" /> Buscar</LoadingButton>
         </form>
         <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
           {resultadosTmdb.length === 0 && !buscandoTmdb ? (
@@ -180,8 +169,8 @@ export default function AdminFilmesPage() {
                       <p className="text-gray-500 text-xs mb-1">{filme.release_date?.substring(0,4)}</p>
                       <p className="text-gray-400 text-xs line-clamp-3 leading-snug">{filme.overview || "Sem sinopse disponível."}</p>
                     </div>
-                    <button onClick={() => handleImportarFilme(filme)} disabled={importandoId === filme.id} className="mt-2 text-xs font-bold text-red-500 hover:text-red-400 text-right uppercase disabled:opacity-50 flex justify-end items-center gap-2">
-                      {importandoId === filme.id ? <><Loader2 className="w-3 h-3 animate-spin" /> Importando...</> : "Importar Filme"}
+                    <button onClick={() => handleImportarFilme(filme)} disabled={importandoId === filme.id} className="mt-2 text-xs font-bold text-red-500 hover:text-red-400 text-right uppercase disabled:opacity-50">
+                      {importandoId === filme.id ? <><Loader2 className="w-3 h-3 animate-spin inline mr-1" /> Importando...</> : "Importar Filme"}
                     </button>
                   </div>
                 </div>
@@ -195,9 +184,7 @@ export default function AdminFilmesPage() {
       </CustomModal>
 
       <CustomModal isOpen={showDeleteModal} title="Excluir Filme" icon={<Trash2 className="w-8 h-8" />} centerTitle>
-        <p className="text-gray-400 mb-8 leading-relaxed text-center">
-          Tem certeza que deseja deletar este filme do catálogo? Esta ação apagará o histórico e as listas de todos os usuários.
-        </p>
+        <p className="text-gray-400 mb-8 leading-relaxed text-center">Tem certeza que deseja deletar este filme do catálogo? Esta ação apagará o histórico e as listas de todos os usuários.</p>
         <div className="flex gap-4 w-full">
           <LoadingButton variant="secondary" onClick={() => setShowDeleteModal(false)}>Cancelar</LoadingButton>
           <LoadingButton onClick={confirmarDeletar} isLoading={deletando} textLoading="Excluindo...">Sim, Excluir</LoadingButton>
@@ -206,13 +193,8 @@ export default function AdminFilmesPage() {
 
       <div>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div>
-            <h2 className="text-3xl font-bold text-white mb-1">Gerenciar Filmes</h2>
-            <p className="text-gray-400">Adicione, edite ou remova os filmes do catálogo.</p>
-          </div>
-          <LoadingButton onClick={() => setShowTmdbModal(true)} className="!w-auto px-6">
-            <Plus className="w-5 h-5 mr-2" /> Adicionar Filme (TMDb)
-          </LoadingButton>
+          <div><h2 className="text-3xl font-bold text-white mb-1">Gerenciar Filmes</h2><p className="text-gray-400">Adicione, edite ou remova os filmes do catálogo.</p></div>
+          <LoadingButton onClick={() => setShowTmdbModal(true)} className="!w-auto px-6"><Plus className="w-5 h-5 mr-2" /> Adicionar Filme (TMDb)</LoadingButton>
         </div>
 
         {carregando ? (
@@ -238,9 +220,7 @@ export default function AdminFilmesPage() {
                     <TableCell>
                       <div className="relative inline-block">
                         <select value={filme.planoMinimo || "BASICO"} onChange={(e) => handleChangePlano(filme, e.target.value)} className={`appearance-none cursor-pointer pr-6 pl-2 py-1 rounded text-[10px] font-extrabold focus:outline-none focus:ring-1 focus:ring-red-600 transition-colors ${filme.planoMinimo === 'PREMIUM' ? 'bg-yellow-500 text-black' : filme.planoMinimo === 'PADRAO' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'}`}>
-                          <option value="BASICO" className="bg-[#141414] text-gray-300 font-bold">BÁSICO</option>
-                          <option value="PADRAO" className="bg-[#141414] text-gray-300 font-bold">PADRÃO</option>
-                          <option value="PREMIUM" className="bg-[#141414] text-gray-300 font-bold">PREMIUM</option>
+                          <option value="BASICO" className="bg-[#141414] text-gray-300 font-bold">BÁSICO</option><option value="PADRAO" className="bg-[#141414] text-gray-300 font-bold">PADRÃO</option><option value="PREMIUM" className="bg-[#141414] text-gray-300 font-bold">PREMIUM</option>
                         </select>
                         <div className="pointer-events-none absolute inset-y-0 right-1 flex items-center px-1"><svg className={`fill-current h-3 w-3 ${filme.planoMinimo === 'PREMIUM' ? 'text-black' : 'text-white'}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg></div>
                       </div>
@@ -250,6 +230,9 @@ export default function AdminFilmesPage() {
                     </TableCell>
                   </TableRow>
                 ))}
+                {filmes.length === 0 && (
+                  <TableRow><TableCell colSpan={5} className="text-center py-10 text-gray-500">Nenhum filme cadastrado.</TableCell></TableRow>
+                )}
               </TableBody>
             </Table>
           </div>

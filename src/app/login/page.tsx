@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react"; // Adicione o useEffect aqui
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/services/api";
@@ -15,6 +15,11 @@ export default function LoginPage() {
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
+
+  // MÁGICA: Acorda o banco de dados na nuvem (Neon.tech) enquanto o usuário digita a senha!
+  useEffect(() => {
+    api.get("/filmes").catch(() => {});
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,25 +52,14 @@ export default function LoginPage() {
         <h1 className="text-3xl font-bold text-white mb-8">Entrar</h1>
 
         <form onSubmit={handleLogin} className="flex flex-col gap-5">
-          {erro && (
-            <div className="bg-red-500/20 border border-red-500 text-red-500 text-sm p-3 rounded text-center">
-              {erro}
-            </div>
-          )}
-
+          {erro && <div className="bg-red-500/20 border border-red-500 text-red-500 text-sm p-3 rounded text-center">{erro}</div>}
           <FloatingInput id="email" type="email" label="Email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           <FloatingInput id="senha" type="password" label="Senha" required value={senha} onChange={(e) => setSenha(e.target.value)} />
-
-          <LoadingButton type="submit" isLoading={carregando} textLoading="Entrando..." className="mt-4">
-            Entrar
-          </LoadingButton>
+          <LoadingButton type="submit" isLoading={carregando} textLoading="Entrando..." className="mt-4">Entrar</LoadingButton>
         </form>
 
         <p className="text-gray-400 mt-6 text-center">
-          Novo por aqui?{" "}
-          <Link href="/" className="text-white hover:underline">
-            Assine agora.
-          </Link>
+          Novo por aqui? <Link href="/" className="text-white hover:underline">Assine agora.</Link>
         </p>
       </div>
     </PageWrapper>

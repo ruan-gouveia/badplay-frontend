@@ -15,6 +15,22 @@ export interface Filme {
   generos: Genero[];
 }
 
+// NOVO: Adicionado Episódio
+export interface Episodio {
+  id: number;
+  nome: string;
+  numeroEpisodio: number;
+  duracaoMinutos: number;
+  trailerUrlYoutube: string;
+}
+
+// NOVO: Adicionado Temporada contendo Episódios
+export interface Temporada {
+  id: number;
+  numeroTemporada: number;
+  episodios: Episodio[];
+}
+
 export interface Serie {
   id: number;
   titulo: string;
@@ -24,6 +40,7 @@ export interface Serie {
   planoMinimo: string;
   trailerUrlYoutube: string;
   generos: Genero[];
+  temporadas: Temporada[]; // <-- AGORA O TYPESCRIPT SABE QUE SÉRIES TÊM TEMPORADAS!
 }
 
 export interface Avaliacao {

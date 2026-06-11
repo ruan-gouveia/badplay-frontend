@@ -1,74 +1,56 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  buscarFilmesCache,
-  buscarSeriesCache,
-  buscarGenerosCache,
-} from "@/services/catalogoCache";
+import { useState } from "react";
+import useSWR from "swr";
+import { api } from "@/services/api";
 import { Filme, Serie, Genero } from "@/types/conteudo";
 import PageWrapper from "@/components/PageWrapper";
 import CardConteudo from "@/components/shared/CardConteudo";
 import { Film, Clapperboard, SearchCheck, Popcorn } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
+// Fetcher Blindado
+const fetcher = (url: string) => api.get(url).then(res => {
+  if (Array.isArray(res.data)) return res.data;
+  if (res.data && Array.isArray(res.data.content)) return res.data.content;
+  return [];
+});
+
 export default function GenerosPage() {
-  const [generos, setGeneros] = useState<Genero[]>([]);
-  const [generoSelecionado, setGeneroSelecionado] = useState<number | null>(
-    null
-  );
+  const { data: generosData, isLoading: loadGeneros } = useSWR<Genero[]>("/generos", fetcher);
+  const { data: filmesData, isLoading: loadFilmes } = useSWR<Filme[]>("/filmes", fetcher);
+  const { data: seriesData, isLoading: loadSeries } = useSWR<Serie[]>("/series", fetcher);
 
-  const [filmes, setFilmes] = useState<Filme[]>([]);
-  const [series, setSeries] = useState<Serie[]>([]);
-  const [carregando, setCarregando] = useState(true);
+  const [generoSelecionado, setGeneroSelecionado] = useState<number | null>(null);
 
-  useEffect(() => {
-    let ativo = true;
+  const carregando = loadGeneros || loadFilmes || loadSeries;
 
-    const buscarDados = async () => {
-      try {
-        const [dadosGeneros, dadosFilmes, dadosSeries] = await Promise.all([
-          buscarGenerosCache(),
-          buscarFilmesCache(),
-          buscarSeriesCache(),
-        ]);
+  const generos = (generosData || []).sort((a, b) => a.nome.localeCompare(b.nome));
 
-        if (!ativo) return;
+  // Seleciona o primeiro gênero por padrão assim que carregar
+  if (generos.length > 0 && generoSelecionado === null) {
+    setGeneroSelecionado(generos[0].id);
+  }
 
-        setGeneros(dadosGeneros);
-        setFilmes(dadosFilmes);
-        setSeries(dadosSeries);
+  // Previne os erros do objeto paginado do Backend
+  const filmesSeguros = Array.isArray(filmesData) ? filmesData : [];
+  const seriesSeguras = Array.isArray(seriesData) ? seriesData : [];
 
-        if (dadosGeneros.length > 0) {
-          setGeneroSelecionado(dadosGeneros[0].id);
-        }
-      } catch (error) {
-        console.error("Erro ao buscar dados", error);
-      } finally {
-        if (ativo) {
-          setCarregando(false);
-        }
-      }
-    };
+  const filmes = filmesSeguros
+    .filter((v, i, a) => a.findIndex(t => t.titulo === v.titulo) === i)
+    .sort((a, b) => a.titulo.localeCompare(b.titulo));
 
-    buscarDados();
+  const series = seriesSeguras
+    .filter((v, i, a) => a.findIndex(t => t.titulo === v.titulo) === i)
+    .sort((a, b) => a.titulo.localeCompare(b.titulo));
 
-    return () => {
-      ativo = false;
-    };
-  }, []);
-
-  const filmesFiltrados = filmes.filter((filme) =>
-    filme.generos?.some((g) => g.id === generoSelecionado)
-  );
-
-  const seriesFiltradas = series.filter((serie) =>
-    serie.generos?.some((g) => g.id === generoSelecionado)
-  );
+  const filmesFiltrados = filmes.filter(filme => filme.generos?.some(g => g.id === generoSelecionado));
+  const seriesFiltradas = series.filter(serie => serie.generos?.some(g => g.id === generoSelecionado));
 
   return (
     <PageWrapper hasNavbar={true}>
       <div className="w-full min-h-screen pt-24 px-6 md:px-12 pb-20">
+        
         <h2 className="text-3xl md:text-4xl font-bold text-white mb-8 flex items-center gap-3">
           <SearchCheck className="w-8 h-8 text-red-600" />
           Explorar por Gêneros
@@ -86,7 +68,6 @@ export default function GenerosPage() {
               <div className="flex gap-4 overflow-x-auto pb-6 pt-2 px-2 custom-scrollbar">
                 {generos.map((genero) => {
                   const isSelected = generoSelecionado === genero.id;
-
                   return (
                     <Badge
                       key={genero.id}
@@ -110,18 +91,9 @@ export default function GenerosPage() {
                 <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2 border-b border-gray-800 pb-3">
                   <Film className="text-red-600 w-7 h-7" /> Filmes
                 </h3>
-
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-4 gap-y-8">
                   {filmesFiltrados.map((filme) => (
-                    <CardConteudo
-                      key={filme.id}
-                      id={filme.id}
-                      titulo={filme.titulo}
-                      capaUrlMinio={filme.capaUrlMinio}
-                      planoMinimo={filme.planoMinimo}
-                      anoLancamento={filme.anoLancamento}
-                      mostrarDetalhes={true}
-                    />
+                    <CardConteudo key={filme.id} id={filme.id} titulo={filme.titulo} capaUrlMinio={filme.capaUrlMinio} planoMinimo={filme.planoMinimo} anoLancamento={filme.anoLancamento} mostrarDetalhes={true} />
                   ))}
                 </div>
               </div>
@@ -132,18 +104,9 @@ export default function GenerosPage() {
                 <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2 border-b border-gray-800 pb-3">
                   <Clapperboard className="text-red-600 w-7 h-7" /> Séries
                 </h3>
-
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-4 gap-y-8">
                   {seriesFiltradas.map((serie) => (
-                    <CardConteudo
-                      key={serie.id}
-                      id={serie.id}
-                      titulo={serie.titulo}
-                      capaUrlMinio={serie.capaUrlMinio}
-                      planoMinimo={serie.planoMinimo}
-                      anoLancamento={serie.anoLancamento}
-                      mostrarDetalhes={true}
-                    />
+                    <CardConteudo key={serie.id} id={serie.id} titulo={serie.titulo} capaUrlMinio={serie.capaUrlMinio} planoMinimo={serie.planoMinimo} anoLancamento={serie.anoLancamento} mostrarDetalhes={true} />
                   ))}
                 </div>
               </div>
@@ -154,14 +117,9 @@ export default function GenerosPage() {
                 <div className="w-24 h-24 bg-red-600/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Popcorn className="w-12 h-12" />
                 </div>
-
-                <h3 className="text-2xl font-bold text-white mb-2">
-                  Poxa, que vazio!
-                </h3>
-
+                <h3 className="text-2xl font-bold text-white mb-2">Poxa, que vazio!</h3>
                 <p className="text-gray-400 text-center max-w-md">
-                  Ainda não temos nenhum conteúdo cadastrado nesta categoria.
-                  Em breve o catálogo será atualizado!
+                  Ainda não temos nenhum conteúdo cadastrado nesta categoria. Em breve o catálogo será atualizado!
                 </p>
               </div>
             )}

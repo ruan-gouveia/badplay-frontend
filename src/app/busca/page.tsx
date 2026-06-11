@@ -1,94 +1,65 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import useSWR from "swr";
 import { api } from "@/services/api";
+import { Filme, Serie } from "@/types/conteudo";
 import PageWrapper from "@/components/PageWrapper";
 import CardConteudo from "@/components/shared/CardConteudo";
 
-interface ConteudoBusca {
-  id: number;
-  titulo: string;
-  descricao?: string;
-  anoLancamento?: number;
-  capaUrlMinio: string;
-  planoMinimo: string;
-  tipo: "FILME" | "SERIE" | "CONTEUDO";
-}
+const fetcher = (url: string) => api.get(url).then(res => {
+  if (Array.isArray(res.data)) return res.data;
+  if (res.data && Array.isArray(res.data.content)) return res.data.content;
+  return [];
+});
 
 function BuscaContent() {
   const searchParams = useSearchParams();
-  const query = searchParams.get("q") || "";
-  const [resultados, setResultados] = useState<ConteudoBusca[]>([]);
-  const [carregando, setCarregando] = useState(false);
+  const query = searchParams.get("q") || ""; 
 
-  useEffect(() => {
-    const controller = new AbortController();
+  const { data: filmesData, isLoading: loadFilmes } = useSWR<Filme[]>("/filmes", fetcher);
+  const { data: seriesData, isLoading: loadSeries } = useSWR<Serie[]>("/series", fetcher);
 
-    const realizarBusca = async () => {
-      const termo = query.trim();
+  const carregando = loadFilmes || loadSeries;
 
-      if (termo.length < 2) {
-        setResultados([]);
-        setCarregando(false);
-        return;
-      }
+  const filmesSeguros = Array.isArray(filmesData) ? filmesData : [];
+  const seriesSeguras = Array.isArray(seriesData) ? seriesData : [];
 
-      setCarregando(true);
+  const todosConteudos = [...filmesSeguros, ...seriesSeguras];
+  
+  const unicos = todosConteudos
+    .filter((v, i, a) => a.findIndex(t => t.titulo === v.titulo) === i)
+    .sort((a, b) => a.titulo.localeCompare(b.titulo));
 
-      try {
-        const resp = await api.get<ConteudoBusca[]>("/conteudos/buscar", {
-          params: {
-            q: termo,
-            limite: 30,
-          },
-          signal: controller.signal,
-        });
-
-        setResultados(resp.data);
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          console.error("Erro na busca", error);
-          setResultados([]);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setCarregando(false);
-        }
-      }
-    };
-
-    realizarBusca();
-
-    return () => controller.abort();
-  }, [query]);
+  const resultados = unicos.filter((c) => 
+    c.titulo.toLowerCase().includes(query.toLowerCase())
+  );
 
   return (
-    <div className="w-full min-h-screen pt-24 px-6 md:px-12">
+    <div className="w-full min-h-screen pt-24 px-6 md:px-12 pb-20">
       <h2 className="text-2xl font-bold text-gray-400 mb-8">
-        Resultados para: <span className="text-white">&quot;{query}&quot;</span>
+        Resultados para: <span className="text-white">"{query}"</span>
       </h2>
 
       {carregando ? (
         <p className="text-gray-500">Buscando...</p>
       ) : resultados.length > 0 ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 gap-y-8 pb-20">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-4 gap-y-8">
           {resultados.map((item) => (
-            <CardConteudo
-              key={`${item.tipo}-${item.id}`}
-              id={item.id}
-              titulo={item.titulo}
-              capaUrlMinio={item.capaUrlMinio}
-              planoMinimo={item.planoMinimo}
-              anoLancamento={item.anoLancamento}
-              mostrarDetalhes={true}
+            <CardConteudo 
+              key={item.id} 
+              id={item.id} 
+              titulo={item.titulo} 
+              capaUrlMinio={item.capaUrlMinio} 
+              planoMinimo={item.planoMinimo} 
+              anoLancamento={item.anoLancamento} 
+              mostrarDetalhes={true} 
             />
           ))}
         </div>
       ) : (
-        <p className="text-gray-500">
-          Nenhum conteúdo encontrado para esta busca.
-        </p>
+        <p className="text-gray-500">Nenhum conteúdo encontrado para esta busca.</p>
       )}
     </div>
   );
