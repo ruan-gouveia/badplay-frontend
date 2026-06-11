@@ -3,20 +3,6 @@ export interface Genero {
   nome: string;
 }
 
-export interface Episodio {
-  id: number;
-  nome: string;
-  numeroEpisodio: number;
-  duracaoMinutos: number;
-  trailerUrlYoutube: string;
-}
-
-export interface Temporada {
-  id: number;
-  numeroTemporada: number;
-  episodios: Episodio[];
-}
-
 export interface Filme {
   id: number;
   titulo: string;
@@ -36,9 +22,8 @@ export interface Serie {
   anoLancamento: number;
   capaUrlMinio: string;
   planoMinimo: string;
-  trailerUrlYoutube?: string;
+  trailerUrlYoutube: string;
   generos: Genero[];
-  temporadas: Temporada[];
 }
 
 export interface Avaliacao {
